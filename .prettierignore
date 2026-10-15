@@ -1,0 +1,7 @@
+node_modules
+**/dist
+dist
+package-lock.json
+.git
+.sites-runtime
+.sites-publish

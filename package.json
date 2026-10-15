@@ -1,0 +1,48 @@
+{
+  "name": "apice-portal",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "db:setup": "node scripts/local-db.mjs setup && npm run build -w @apice/domain && npm run build -w @apice/api && node scripts/migrate.mjs && node scripts/seed.mjs",
+    "db:start": "node scripts/local-db.mjs start",
+    "db:stop": "node scripts/local-db.mjs stop",
+    "db:migrate": "npm run build -w @apice/domain && npm run build -w @apice/api && node scripts/migrate.mjs",
+    "db:backup": "node scripts/local-db.mjs backup",
+    "db:export": "npm run build -w @apice/domain && npm run build -w @apice/api && node scripts/data-transfer.mjs export",
+    "db:import": "node scripts/data-transfer.mjs import",
+    "test:database": "npm run build -w @apice/domain && npm run build -w @apice/api && node scripts/test-database.mjs",
+    "test:workflows": "npm run build -w @apice/domain && npm run build -w @apice/api && node scripts/test-template-workflow.mjs",
+    "test:tv": "npm run build -w @apice/domain && npm run build -w @apice/api && node scripts/test-tv.mjs",
+    "test:massive": "npm run check && npm run test:database && npm run test:e2e",
+    "build": "npm run build -w @apice/domain && npm run build -w @apice/api && npm run build -w @apice/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run build -w @apice/domain && npm run build -w @apice/api && vitest run",
+    "lint": "eslint apps packages",
+    "check": "npm run typecheck && npm run lint && npm test && npm run build",
+    "test:e2e": "playwright test --config playwright.auth.config.ts",
+    "build:preview": "node scripts/build-preview.mjs",
+    "format": "prettier --write \"apps/**/*.{ts,tsx,css,html,json}\" \"packages/**/*.{ts,json}\" \"tests/**/*.ts\" \"scripts/*.mjs\" \"*.{json,ts,js,md}\" \"docs/*.md\""
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.64.0",
+    "@types/node": "26.6.4",
+    "eslint": "10.12.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "eslint-plugin-react-refresh": "0.5.7",
+    "fast-check": "4.10.2",
+    "prettier": "3.9.9",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.1",
+    "vitest": "5.0.3"
+  }
+}

@@ -1,0 +1,294 @@
+.task-deadline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 5px 9px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.task-deadline-neutral {
+  color: var(--muted);
+  background: var(--paper);
+  border-color: var(--line);
+}
+
+.task-deadline-today {
+  color: var(--teal);
+  background: color-mix(in srgb, var(--accent) 9%, white);
+  border-color: color-mix(in srgb, var(--accent) 35%, white);
+}
+
+.task-deadline-today > svg {
+  color: var(--accent);
+}
+
+.task-deadline-warning {
+  color: var(--warning);
+  background: var(--warning-soft);
+  border-color: color-mix(in srgb, var(--warning) 20%, white);
+}
+
+.task-deadline-danger {
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-color: color-mix(in srgb, var(--danger) 20%, white);
+}
+
+.task-deadline-success {
+  color: var(--success);
+  background: var(--success-soft);
+  border-color: color-mix(in srgb, var(--success) 20%, white);
+}
+
+.task-situation {
+  display: grid;
+  justify-items: start;
+  gap: 7px;
+}
+
+.task-workflow {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.task-workflow-returned,
+.task-workflow-waiting {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.task-table .task-row td:first-child {
+  border-left: 3px solid var(--line);
+}
+
+.task-table .task-row:has(.task-deadline-today) td:first-child {
+  border-left-color: var(--accent);
+}
+
+.task-table .task-row:has(.task-deadline-warning) td:first-child {
+  border-left-color: var(--warning);
+}
+
+.task-table .task-row:has(.task-deadline-danger) td:first-child {
+  border-left-color: var(--danger);
+}
+
+.task-table .task-row:has(.task-deadline-success) td:first-child {
+  border-left-color: var(--success);
+}
+
+.task-table .date-value {
+  display: inline-block;
+  color: var(--ink);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.task-table .date-value.date-warning {
+  color: var(--warning);
+}
+
+.task-table .date-value.date-danger {
+  color: var(--danger);
+}
+
+.task-summary .summary-stat-alert {
+  color: var(--danger);
+  text-align: left;
+  border-radius: 7px;
+}
+
+.task-summary .summary-stat-alert:hover {
+  background: var(--danger-soft);
+}
+
+.task-summary .summary-stat-alert:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 5px;
+}
+.task-summary .summary-late-filter {
+  display: flex;
+  min-width: 115px;
+  min-height: 54px;
+  padding: 8px 12px;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-left-color: var(--line);
+  border-radius: 8px;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s;
+}
+.task-summary .summary-late-filter[aria-pressed="true"] {
+  background: var(--danger-soft);
+  border-color: color-mix(in srgb, var(--danger) 25%, white);
+}
+.task-summary .summary-late-filter[aria-pressed="true"] span {
+  color: var(--danger);
+}
+.task-table {
+  table-layout: fixed;
+}
+.task-company-column {
+  width: 34%;
+}
+.task-date-column {
+  width: 12%;
+}
+.task-situation-column {
+  width: 24%;
+}
+.task-owner-column {
+  width: 18%;
+}
+.task-table .company-info {
+  min-width: 0;
+}
+.task-table .company-cell {
+  min-width: 0;
+}
+.task-table .company-info > strong,
+.task-table .company-info > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (min-width: 761px) {
+  .tasks-surface {
+    --task-row-height: 88px;
+  }
+  .task-table .task-row {
+    height: var(--task-row-height);
+  }
+  .tasks-surface .table-wrap {
+    min-height: calc(8 * var(--task-row-height) + 44px);
+  }
+  .tasks-surface > .empty-state {
+    min-height: calc(8 * var(--task-row-height) + 44px);
+  }
+}
+@media (min-width: 1450px) {
+  .tasks-surface {
+    --task-row-height: 92px;
+  }
+}
+@media (min-width: 761px) and (max-width: 1100px) {
+  .task-company-column {
+    width: 39%;
+  }
+  .task-date-column {
+    width: 15%;
+  }
+  .task-situation-column {
+    width: 31%;
+  }
+  .task-owner-column {
+    width: 0;
+  }
+}
+
+.drawer-meta .task-workflow {
+  padding: 0 3px;
+}
+
+@media (max-width: 760px) {
+  .task-summary {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 14px;
+  }
+  .task-summary .summary-intro {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .task-summary .summary-late-filter {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 100px;
+  }
+  .task-summary .summary-progress {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    max-width: none;
+  }
+  .task-table colgroup {
+    display: none;
+  }
+  .task-table,
+  .task-table tbody {
+    display: block;
+    width: 100%;
+  }
+  .task-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .task-table .task-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    padding: 18px 16px;
+    border-bottom: 1px solid var(--line);
+    border-left: 3px solid var(--line);
+  }
+  .task-table .task-row:has(.task-deadline-today) {
+    border-left-color: var(--accent);
+  }
+  .task-table .task-row:has(.task-deadline-warning) {
+    border-left-color: var(--warning);
+  }
+  .task-table .task-row:has(.task-deadline-danger) {
+    border-left-color: var(--danger);
+  }
+  .task-table .task-row:has(.task-deadline-success) {
+    border-left-color: var(--success);
+  }
+  .task-table .task-row td {
+    padding: 0;
+    border: 0;
+  }
+  .task-table .task-row td:first-child {
+    grid-column: 1 / -1;
+    border-left: 0;
+  }
+  .task-table .company-cell {
+    min-width: 0;
+  }
+  .task-table .task-row td:nth-child(2)::before,
+  .task-table .task-row td:nth-child(3)::before {
+    display: block;
+    margin-bottom: 5px;
+    color: var(--muted);
+    font-size: 0.6875rem;
+  }
+  .task-table .task-row td:nth-child(2)::before {
+    content: "Meta interna";
+  }
+  .task-table .task-row td:nth-child(3)::before {
+    content: "Prazo legal";
+  }
+  .task-table .task-row td:nth-child(4) {
+    grid-column: 1 / -1;
+  }
+  .task-table .task-situation {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+  }
+}

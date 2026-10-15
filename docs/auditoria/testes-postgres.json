@@ -1,0 +1,131 @@
+{
+  "startedAt": "2026-10-08T11:44:44.917Z",
+  "databaseEngine": "PostgreSQL",
+  "checks": [
+    {
+      "name": "migrações repetidas preservam checksum e não duplicam estrutura",
+      "status": "passed",
+      "ms": 118
+    },
+    {
+      "name": "conexão ociosa interrompida não derruba o processo e o pool reconecta",
+      "status": "passed",
+      "ms": 87
+    },
+    {
+      "name": "dois tenants com IDs iguais permanecem isolados pelo adaptador e por RLS",
+      "status": "passed",
+      "ms": 51
+    },
+    {
+      "name": "RLS nega escrita estrangeira e FK composta nega responsável de outro tenant",
+      "status": "passed",
+      "ms": 11
+    },
+    {
+      "name": "audit e documentos não podem ser alterados/excluídos pelo papel da API",
+      "status": "passed",
+      "ms": 3
+    },
+    {
+      "name": "API PostgreSQL: criar, iniciar, etapas, PDF/XML, versões, submissão e conferência independente",
+      "status": "passed",
+      "ms": 212
+    },
+    {
+      "name": "API PostgreSQL: reabrir, esperar/retomar, devolver, dispensa e redistribuir",
+      "status": "passed",
+      "ms": 122
+    },
+    {
+      "name": "API PostgreSQL: conclusão direta exige todas as etapas/evidência; consulta não altera",
+      "status": "passed",
+      "ms": 68
+    },
+    {
+      "name": "80 alterações concorrentes na mesma revisão: uma alteração e 79 conflitos",
+      "status": "passed",
+      "ms": 502
+    },
+    {
+      "name": "erro após atualização SQL desfaz tarefa, evidência e audit na transação",
+      "status": "passed",
+      "ms": 18
+    },
+    {
+      "name": "importação inválida não grava parcialmente e duplicados retornam conflito",
+      "status": "passed",
+      "ms": 35
+    },
+    {
+      "name": "identidade/perfil forjado, arquivo inválido e download fora do escopo são rejeitados",
+      "status": "passed",
+      "ms": 19
+    },
+    {
+      "name": "nomes UTF-8, limite de arquivo e quota documental preservam consistência",
+      "status": "passed",
+      "ms": 44
+    },
+    {
+      "name": "backend revalida o papel persistido mesmo com sessão antiga ou ator forjado",
+      "status": "passed",
+      "ms": 50
+    },
+    {
+      "name": "reiniciar API conserva tarefas, versões, conteúdo/hash e auditoria",
+      "status": "passed",
+      "ms": 96
+    },
+    {
+      "name": "500 empresas × 8 modelos: 4.000 tarefas e 12 gerações concorrentes idempotentes",
+      "status": "passed",
+      "ms": 6014
+    },
+    {
+      "name": "unicidade da recorrência também bloqueia duplicação por SQL direto",
+      "status": "passed",
+      "ms": 5
+    },
+    {
+      "name": "backup e restauração reais preservam registros e todos os hashes de evidências",
+      "status": "passed",
+      "ms": 1037
+    },
+    {
+      "name": "exportação portátil valida hashes, preserva tenants/IDs repetidos e importa atomicamente",
+      "status": "passed",
+      "ms": 755
+    },
+    {
+      "name": "rate limit canônico, barra final e caixa alternativa compartilham o mesmo limite",
+      "status": "passed",
+      "ms": 290
+    },
+    {
+      "name": "identidade PostgreSQL: login, senha inicial, concessão a operador, rollback, revogação e último gestor",
+      "status": "passed",
+      "ms": 2194
+    }
+  ],
+  "load": {
+    "concurrentCommands": 80,
+    "companies": 500,
+    "models": 8,
+    "tasks": 4000,
+    "concurrentGenerations": 12,
+    "generationBatchMs": 3169,
+    "snapshotBytes": 3263548,
+    "concurrentReaders": 40,
+    "snapshotP50Ms": 1700,
+    "snapshotP95Ms": 2814
+  },
+  "fixtures": {
+    "restoredDocuments": 36,
+    "restoredTasks": 4097,
+    "portableDocuments": 36,
+    "portableTasks": 4097
+  },
+  "finishedAt": "2026-10-08T11:44:57.143Z",
+  "status": "passed"
+}

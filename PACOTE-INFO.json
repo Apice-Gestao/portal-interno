@@ -1,0 +1,22 @@
+{
+  "project": "Portal-Apice",
+  "date": "2026-10-14",
+  "sourceCommit": "b4d060ae428bce744aa58496868bba3f71e14436",
+  "type": "source-code-sanitized",
+  "databaseIncluded": false,
+  "privateConfigurationIncluded": false,
+  "gitHistoryIncluded": false,
+  "dependenciesIncluded": false,
+  "temporariesPresent": [
+    "tv-simulation",
+    "local-test-login-unconfigured"
+  ],
+  "sanitizedDocumentationFiles": [
+    "AGENTS.md",
+    "docs/AUDITORIA-PRD-2026-10-08.md",
+    "docs/BANCO-LOCAL.md",
+    "docs/CONTEXTO.md",
+    "docs/REVISAO-DOCUMENTACAO-2026-10-09.md",
+    "docs/REVISAO-E-VALIDACAO-2026-10-08.md"
+  ]
+}
