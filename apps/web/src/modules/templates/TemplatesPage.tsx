@@ -116,6 +116,11 @@ export function TaskTemplatesPage() {
       notify(
         `${response.created} tarefas geradas; ${response.existing} existentes preservadas.${response.blocked ? ` ${response.blocked} empresas aguardam a implantação.` : ""}`,
       );
+      // Companies that need a responsible stay visible until fixed.
+      if (response.skipped?.length)
+        setError(
+          `Sem responsável válido, não geradas: ${response.skipped.join(", ")}. Ajuste a carteira e gere de novo.`,
+        );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Geração indisponível.");
     } finally {

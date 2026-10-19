@@ -2,7 +2,7 @@ import { canSeeTask, isManager } from "./selectors.js";
 import { buildReport } from "./reports.js";
 import { businessDate } from "./dates.js";
 import { closedCompetence, SYSTEM_ACTOR_ID } from "./automation.js";
-import { latestDocuments } from "./documents.js";
+import { latestDocuments, xmlRuleMismatch } from "./documents.js";
 import type { ReportFilters } from "./reports.js";
 import {
   generationSchema,
@@ -30,6 +30,7 @@ import { MemoryRepository } from "./types.js";
 import {
   companyAtCompetence,
   companyServes,
+  companyStatusBase,
   companyStatusGeneratesTasks,
   isKnownCompanyStatus,
   requiredDocumentTypes,
@@ -155,12 +156,37 @@ export class PortalEngine {
     );
     return {
       workspace,
-      changeProposals: (state.changeProposals ?? []).filter(
-        (p) =>
-          p.tenantId === actor.tenantId &&
-          (hasPermission(actor, "changes.manage") ||
-            hasPermission(actor, "companies.manage")),
-      ),
+      changeProposals: (state.changeProposals ?? []).filter((p) => {
+        if (
+          p.tenantId !== actor.tenantId ||
+          !(
+            hasPermission(actor, "changes.manage") ||
+            hasPermission(actor, "companies.manage")
+          )
+        )
+          return false;
+        // Only proposals affecting the actor's sectors (L11, C02/C03):
+        // responsibilities changed by the patch and, when regime, situation
+        // or end change, every sector that serves the company.
+        const company = state.companies.find(
+          (c) => c.id === p.companyId && c.tenantId === actor.tenantId,
+        );
+        if (!company) return false;
+        const affected = new Set(Object.keys(p.patch.responsibilities ?? {}));
+        const operational =
+          p.patch.regime !== undefined ||
+          p.patch.status !== undefined ||
+          p.patch.serviceEndCompetence !== undefined;
+        if (operational) {
+          const current = companyAtCompetence(company, p.effectiveCompetence);
+          if (!current.responsibilities) return true;
+          for (const [department, item] of Object.entries(
+            current.responsibilities,
+          ))
+            if (item && item.mode !== "none") affected.add(department);
+        }
+        return actor.departments.some((d) => affected.has(d));
+      }),
       now: this.clock(),
       persistence: "memory",
       actor: {
@@ -350,9 +376,11 @@ export class PortalEngine {
         ? "tasks.review"
         : command.type === "retain_applicability"
           ? "tasks.manage"
-          : ["assign", "dispense", "reopen", "cancel"].includes(command.type)
-            ? (`tasks.${command.type}` as Permission)
-            : "tasks.execute",
+          : command.type === "deny_dispense"
+            ? "tasks.dispense"
+            : ["assign", "dispense", "reopen", "cancel"].includes(command.type)
+              ? (`tasks.${command.type}` as Permission)
+              : "tasks.execute",
       command.type !== "retain_applicability",
     );
     this.writable(actor);
@@ -392,8 +420,10 @@ export class PortalEngine {
     const manager =
       isManager(actor) ||
       (actor.permissions !== undefined &&
-        ["assign", "dispense", "reopen", "cancel"].includes(command.type) &&
-        hasPermission(actor, `tasks.${command.type}` as Permission));
+        ((["assign", "dispense", "reopen", "cancel"].includes(command.type) &&
+          hasPermission(actor, `tasks.${command.type}` as Permission)) ||
+          (command.type === "deny_dispense" &&
+            hasPermission(actor, "tasks.dispense"))));
     const owner = t.assigneeId === actor.userId;
     const queue =
       t.assigneeId === `department:${t.department}` &&
@@ -411,7 +441,7 @@ export class PortalEngine {
         "Você não é responsável por esta tarefa.",
         403,
       );
-    let action = "";
+    let action: string;
     let detail = t.title;
     switch (command.type) {
       case "retain_applicability":
@@ -494,6 +524,7 @@ export class PortalEngine {
         t.status = "done";
         t.completedAt = this.clock();
         t.originalCompletedAt ??= t.completedAt;
+        t.dispenseRequested = false;
         action = "Tarefa concluída";
         break;
       case "approve":
@@ -512,6 +543,7 @@ export class PortalEngine {
         t.status = "done";
         t.completedAt = this.clock();
         t.originalCompletedAt ??= t.completedAt;
+        t.dispenseRequested = false;
         action = "Conferência aprovada";
         break;
       case "return":
@@ -527,7 +559,8 @@ export class PortalEngine {
             403,
           );
         t.status = "returned";
-        t.executionActorIds = [];
+        // Everyone who executed or attached in any cycle stays barred from
+        // reviewing: earlier evidence remains on the task (L01, 19/10/2026).
         t.executorId = undefined;
         t.steps = t.steps.map((s) => ({ ...s, completed: false }));
         t.reopenedCount++;
@@ -561,6 +594,22 @@ export class PortalEngine {
           );
         t.dispenseRequested = true;
         action = "Dispensa solicitada";
+        detail = command.reason;
+        break;
+      case "deny_dispense":
+        if (!manager)
+          throw new DomainError(
+            "FORBIDDEN",
+            "Seu acesso não permite decidir dispensas.",
+            403,
+          );
+        if (!t.dispenseRequested || ["done", "dispensed"].includes(t.status))
+          throw new DomainError(
+            "INVALID_STATE",
+            "Esta tarefa não tem pedido de dispensa pendente.",
+          );
+        t.dispenseRequested = false;
+        action = "Dispensa negada";
         detail = command.reason;
         break;
       case "dispense":
@@ -599,6 +648,7 @@ export class PortalEngine {
             "INVALID_STATE",
             "Não é possível cancelar esta tarefa. Preserve o fluxo e o histórico.",
           );
+        t.cancelledFromStatus = t.status;
         t.status = "dispensed";
         t.cancelled = true;
         delete t.applicabilityReview;
@@ -618,9 +668,20 @@ export class PortalEngine {
             "INVALID_STATE",
             "A tarefa precisa estar encerrada.",
           );
+        t.dispenseRequested = false;
+        if (t.cancelled) {
+          // Undoing a cancellation puts the task back where it was, with its
+          // progress; it is not rework (L13, 19/10/2026).
+          t.status =
+            t.cancelledFromStatus ?? (t.startedAt ? "in_progress" : "todo");
+          delete t.cancelled;
+          delete t.cancelledFromStatus;
+          action = "Cancelamento desfeito e tarefa reaberta";
+          detail = command.reason;
+          break;
+        }
         t.status = "in_progress";
-        t.executionActorIds = [];
-        delete t.cancelled;
+        // Previous executors stay recorded so they cannot review the redo (L01).
         t.executorId = undefined;
         t.completedAt = undefined;
         t.steps = t.steps.map((s) => ({ ...s, completed: false }));
@@ -634,6 +695,12 @@ export class PortalEngine {
             "FORBIDDEN",
             "A redistribuição exige coordenador ou administrador.",
             403,
+          );
+        // Closed work keeps its responsible: it is the delivery record (L05).
+        if (["done", "dispensed"].includes(t.status))
+          throw new DomainError(
+            "INVALID_STATE",
+            "Tarefas encerradas não podem ser redistribuídas. Reabra antes, se necessário.",
           );
         {
           const user = state.users.find(
@@ -668,6 +735,8 @@ export class PortalEngine {
           detail = user.name;
         }
         break;
+      default:
+        throw new DomainError("INVALID_COMMAND", "Ação desconhecida.");
     }
     if (queue && command.type === "start" && t.onboardingId) {
       const onboarding = state.companyOnboardings?.find(
@@ -692,6 +761,8 @@ export class PortalEngine {
     id: string,
     revision: number,
     evidence: UploadEvidence,
+    /** File bytes, only read to check XML rules; never stored in the state. */
+    content?: Uint8Array,
   ): Task {
     this.requirePermission(actor, "tasks.attach");
     this.writable(actor);
@@ -755,6 +826,18 @@ export class PortalEngine {
           "INVALID_DOCUMENT_TYPE",
           "Tipo documental ou formato indisponível.",
         );
+    }
+    if (doc.kind === "XML" && content) {
+      const mismatch = xmlRuleMismatch(new TextDecoder().decode(content), {
+        task: t,
+        companyCnpj: state.companies.find(
+          (c) => c.id === t.companyId && c.tenantId === t.tenantId,
+        )?.cnpj,
+        documentTypeId: doc.documentTypeId,
+        fileName: evidence.name,
+        rules: workspaceOf(state, actor.tenantId).documentRules,
+      });
+      if (mismatch) throw new DomainError("DOCUMENT_MISMATCH", mismatch);
     }
     t.executionActorIds = [...new Set([...t.executionActorIds, actor.userId])];
     t.executorId = actor.userId;
@@ -1197,6 +1280,13 @@ export class PortalEngine {
         "INVALID_TRANSFER",
         "Informe a revisão de todas as empresas selecionadas.",
       );
+    const closed = closedCompetence(this.clock());
+    const effectiveCompetence = body.effectiveCompetence ?? closed;
+    if (effectiveCompetence < closed)
+      throw new DomainError(
+        "INVALID_PERIOD",
+        "A transferência vale a partir da competência em trabalho ou de uma posterior.",
+      );
     let tasks = 0;
     for (const id of body.companyIds) {
       const company = this.companyForWrite(
@@ -1205,14 +1295,10 @@ export class PortalEngine {
         id,
         body.expectedRevisions[id]!,
       );
-      const responsibilities = {
-        ...(companyAtCompetence(company, businessDate(this.clock()).slice(0, 7))
-          .responsibilities ?? {}),
-        [body.department]: body.target,
-      };
+      // Only this sector changes; other sectors keep their own history.
       (company.operationalHistory ??= []).push({
-        responsibilities,
-        effectiveCompetence: businessDate(this.clock()).slice(0, 7),
+        responsibilities: { [body.department]: body.target },
+        effectiveCompetence,
         proposalId: this.id("transfer"),
       });
       company.revision = (company.revision ?? 1) + 1;
@@ -1222,6 +1308,9 @@ export class PortalEngine {
             t.tenantId === actor.tenantId &&
             t.companyId === id &&
             t.department === body.department &&
+            // A future transfer leaves earlier competences with whoever is
+            // serving them; from the current one on, all open work moves (C04).
+            (effectiveCompetence <= closed || t.competence >= effectiveCompetence) &&
             !["done", "dispensed"].includes(t.status) &&
             !t.onboardingId,
         )) {
@@ -1361,6 +1450,27 @@ export class PortalEngine {
       parsed.data.patch.responsibilities,
     );
     if (
+      companyStatusBase(parsed.data.patch.status) === "closing" &&
+      !companyAtCompetence(
+        {
+          ...company,
+          operationalHistory: [
+            ...(company.operationalHistory ?? []),
+            {
+              ...parsed.data.patch,
+              effectiveCompetence: parsed.data.effectiveCompetence,
+              proposalId: "preview",
+            },
+          ],
+        },
+        parsed.data.effectiveCompetence,
+      ).serviceEndCompetence
+    )
+      throw new DomainError(
+        "INVALID_PERIOD",
+        "Informe a última competência do atendimento para o encerramento.",
+      );
+    if (
       parsed.data.patch.serviceEndCompetence &&
       parsed.data.patch.serviceEndCompetence < parsed.data.effectiveCompetence
     )
@@ -1443,19 +1553,12 @@ export class PortalEngine {
         "A proposta já mudou. Atualize a central.",
         409,
       );
-    const company =
-      input.decision === "approve"
-        ? this.companyForWrite(
-            state,
-            actor,
-            proposal.companyId,
-            proposal.expectedCompanyRevision,
-          )
-        : state.companies.find(
-            (item) =>
-              item.id === proposal.companyId &&
-              item.tenantId === actor.tenantId,
-          );
+    // The decision recomputes the impact against the current company, so a
+    // proposal stays decidable after another one or a simple edit (L07).
+    const company = state.companies.find(
+      (item) =>
+        item.id === proposal.companyId && item.tenantId === actor.tenantId,
+    );
     if (!company)
       throw new DomainError(
         "NOT_FOUND",
@@ -1538,15 +1641,29 @@ export class PortalEngine {
             { task, before },
           );
       }
-      // Generate only the affected competence. Existing task keys remain untouched.
-      for (const department of actor.departments)
-        this.generateInState(
-          state,
-          actor,
-          proposal.effectiveCompetence,
-          department,
-          company.id,
-        );
+      // Generate only the affected competence, and only once it is closed: a
+      // future competence is created by the regular monthly generation (L06).
+      // A missing responsible is reported instead of blocking the decision.
+      if (proposal.effectiveCompetence <= closedCompetence(this.clock())) {
+        const skipped: string[] = [];
+        for (const department of actor.departments)
+          this.generateInState(
+            state,
+            actor,
+            proposal.effectiveCompetence,
+            department,
+            company.id,
+            skipped,
+          );
+        if (skipped.length)
+          this.record(
+            state,
+            actor,
+            "Geração da alteração com pendências",
+            `${proposal.effectiveCompetence} · sem responsável válido: ${company.name}. Defina o responsável e gere de novo.`,
+            { companyId: company.id },
+          );
+      }
       proposal.status = "approved";
     } else proposal.status = "rejected";
     proposal.revision++;
@@ -1597,6 +1714,14 @@ export class PortalEngine {
       throw new DomainError(
         "INVALID_STATUS",
         "Situação não cadastrada neste grupo.",
+      );
+    if (
+      companyStatusBase(body.status) === "closing" &&
+      !body.serviceEndCompetence
+    )
+      throw new DomainError(
+        "INVALID_PERIOD",
+        "Informe a última competência do atendimento para empresas em encerramento.",
       );
     if (
       !state.users.some(
@@ -1908,12 +2033,22 @@ export class PortalEngine {
     index: number,
   ) {
     const stage = onboarding.stages[index]!;
-    this.onboardingAssignee(
-      state,
-      onboarding.tenantId,
-      stage.department,
-      stage.assigneeId,
-    );
+    try {
+      this.onboardingAssignee(
+        state,
+        onboarding.tenantId,
+        stage.department,
+        stage.assigneeId,
+      );
+    } catch (error) {
+      // Say which stage blocks the handoff, so the manager can fix it (L03).
+      if (index > 0)
+        throw new DomainError(
+          "INVALID_ASSIGNEE",
+          `A próxima etapa (“${stage.title}”, ${stage.department}) está com responsável inativo ou sem acesso. Peça ao gestor para trocar o responsável na implantação antes de concluir.`,
+        );
+      throw error;
+    }
     const today = businessDate(this.clock());
     const due = (offset: number) => {
       const date = new Date(`${today}T00:00:00Z`);
@@ -2237,7 +2372,7 @@ export class PortalEngine {
       tenantId: actor.tenantId,
       templateId: "avulsa",
       templateVersion: 1,
-      competence: businessDate(this.clock()).slice(0, 7),
+      competence: input.competence ?? businessDate(this.clock()).slice(0, 7),
       status: "todo",
       executionActorIds: [],
       steps: [
@@ -2515,7 +2650,17 @@ export class PortalEngine {
         403,
       );
     const state = this.repository.read();
-    const result = this.generateInState(state, actor, competence, department);
+    // Companies without a valid responsible are skipped and named, so one
+    // deactivated person never blocks the whole department (19/10/2026).
+    const skipped: string[] = [];
+    const result = this.generateInState(
+      state,
+      actor,
+      competence,
+      department,
+      undefined,
+      skipped,
+    );
     this.record(
       state,
       actor,
@@ -2523,8 +2668,16 @@ export class PortalEngine {
       `${competence} · ${result.created} geradas · ${result.existing} existentes`,
       { department },
     );
+    if (skipped.length)
+      this.record(
+        state,
+        actor,
+        "Geração com pendências",
+        `${competence} · sem responsável válido: ${skipped.join(", ")}. Defina o responsável e gere de novo.`,
+        { department },
+      );
     this.repository.replace(state);
-    return result;
+    return { ...result, skipped };
   }
   private generateInState(
     state: PortalState,
@@ -2542,6 +2695,7 @@ export class PortalEngine {
     let created = 0;
     let existing = 0;
     let blocked = 0;
+    const fallbackNoted = new Set<string>();
     companies: for (const original of state.companies.filter(
       (c) =>
         c.tenantId === actor.tenantId &&
@@ -2623,6 +2777,25 @@ export class PortalEngine {
           throw new DomainError(
             "NO_OWNER",
             `Defina um responsável para ${c.name}.`,
+          );
+        }
+        const ownerRecord = state.users.find(
+          (u) => u.userId === c.ownerId && u.tenantId === actor.tenantId,
+        );
+        if (
+          responsibility?.mode !== "department" &&
+          !owner &&
+          (!ownerRecord || ownerRecord.departments.includes(department)) &&
+          !fallbackNoted.has(c.id)
+        ) {
+          // The portfolio owner lost access: make the substitute visible (L03).
+          fallbackNoted.add(c.id);
+          this.record(
+            state,
+            actor,
+            "Responsável substituto na geração",
+            `${competence} · ${c.name}: responsável da carteira inativo ou sem acesso em ${department}; tarefas atribuídas a ${fallback?.name ?? assigneeId}. Transfira a carteira.`,
+            { companyId: c.id, department },
           );
         }
         state.tasks.push({

@@ -25,6 +25,8 @@ interface StoredSession {
   mustChangePassword: boolean;
   passwordVersion?: string;
 }
+const SESSIONS_PER_PERSON = 5;
+const MAX_SESSIONS = 5000;
 @Injectable()
 export class SessionService {
   private readonly sessions = new Map<string, StoredSession>();
@@ -35,7 +37,19 @@ export class SessionService {
   private issue(identity: Identity, mode: StoredSession["mode"]) {
     for (const [key, value] of this.sessions)
       if (value.expiresAt < Date.now()) this.sessions.delete(key);
-    if (this.sessions.size >= 100)
+    // Per person, not global (S03, 19/10/2026): a new login drops that
+    // person's oldest sessions beyond the limit, so nobody locks others out.
+    const own = [...this.sessions.entries()]
+      .filter(
+        ([, value]) =>
+          value.actor.tenantId === identity.actor.tenantId &&
+          value.actor.userId === identity.actor.userId,
+      )
+      .sort(([, a], [, b]) => a.expiresAt - b.expiresAt);
+    for (const [key] of own.slice(0, Math.max(0, own.length - (SESSIONS_PER_PERSON - 1))))
+      this.sessions.delete(key);
+    // Memory guard only; far above any real office.
+    if (this.sessions.size >= MAX_SESSIONS)
       throw new UnauthorizedException("Limite de sessões atingido.");
     const token = randomBytes(32).toString("base64url");
     const expiresAt = Date.now() + 60 * 60 * 1000;

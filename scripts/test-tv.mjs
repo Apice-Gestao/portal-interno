@@ -203,6 +203,8 @@ try {
         name: "TV Fiscal de teste",
         departments: ["Fiscal"],
         competence: "2026-09",
+        // Pinned so the checks stay valid in any month.
+        followCurrent: false,
       };
       await api("post", "/tv-devices", undefined, input).expect(401);
       await api("post", "/tv-devices", readerToken, input).expect(403);
@@ -687,6 +689,8 @@ try {
           name: "TV Societário de teste",
           departments: [department],
           competence: task.competence,
+          // Pinned to the task's month (devices follow the one in progress by default).
+          followCurrent: false,
         }).expect(201)
       ).body;
       await api("patch", `/tv-devices/${dynamicDevice.id}`, managerToken, {

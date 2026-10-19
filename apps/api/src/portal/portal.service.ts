@@ -53,13 +53,19 @@ export class PortalService implements OnModuleDestroy {
     return this.store.run(
       actor,
       (engine, resolved) =>
-        engine.attach(resolved, id, revision, {
-          ...metadata,
-          name,
-          bytes: file.buffer.length,
-          kind,
-          hash: createHash("sha256").update(file.buffer).digest("hex"),
-        }),
+        engine.attach(
+          resolved,
+          id,
+          revision,
+          {
+            ...metadata,
+            name,
+            bytes: file.buffer.length,
+            kind,
+            hash: createHash("sha256").update(file.buffer).digest("hex"),
+          },
+          file.buffer,
+        ),
       file.buffer,
     );
   }

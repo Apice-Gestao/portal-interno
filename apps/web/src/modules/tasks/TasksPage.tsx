@@ -623,7 +623,8 @@ export default function TasksPage() {
                               {!["done", "dispensed"].includes(t.status) && (
                                 <TaskWorkflowLabel status={t.status} />
                               )}
-                              {t.dispenseRequested && (
+                              {t.dispenseRequested &&
+                                !["done", "dispensed"].includes(t.status) && (
                                 <span className="date-hint">
                                   Dispensa solicitada
                                 </span>
@@ -704,6 +705,8 @@ export default function TasksPage() {
         )}
       </section>
       <NewTaskModal
+        // Fresh form (and competence) each time it opens.
+        key={create ? `open:${competence}` : "closed"}
         open={create && hasPermission(actor, "tasks.create")}
         onOpenChange={setCreate}
       />

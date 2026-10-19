@@ -474,3 +474,19 @@ fieldset:disabled .account-checkbox {
     white-space: normal;
   }
 }
+
+/* What stays with a person who is being deactivated (19/10/2026). */
+.account-pending {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+.account-pending ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 3px;
+}
+.account-pending p {
+  margin: 0;
+}

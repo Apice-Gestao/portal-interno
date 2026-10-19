@@ -20,6 +20,7 @@ import {
   hasPermission,
   TV_BLOCKS,
   TV_DEFAULT_BLOCKS,
+  tvCompetence,
 } from "@apice/domain";
 import type { Department, TvBlock, TvDevice } from "@apice/domain";
 import { usePortal } from "../../app/usePortal";
@@ -41,12 +42,13 @@ type EditorState = {
   name: string;
   departments: Department[];
   competence: string;
+  followCurrent: boolean;
   showNames: boolean;
   blocks: TvBlock[];
   rotationSeconds: number;
 };
 export default function TvPage() {
-  const { actor, client, competence, notify } = usePortal();
+  const { actor, client, competence, notify, data } = usePortal();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const simulation = TV_SIMULATION_AVAILABLE && params.get("simulacao") === "1";
@@ -99,6 +101,7 @@ export default function TvPage() {
       name: device?.name ?? "",
       departments: device ? [...device.departments] : [...actor.departments],
       competence: device?.competence ?? competence,
+      followCurrent: device?.followCurrent !== false,
       showNames: device?.showNames ?? false,
       blocks: device
         ? [...device.blocks]
@@ -125,6 +128,7 @@ export default function TvPage() {
           name: editor.name.trim(),
           departments: editor.departments,
           competence: editor.competence,
+          followCurrent: editor.followCurrent,
           showNames: editor.showNames,
           blocks: editor.blocks,
           rotationSeconds: editor.rotationSeconds,
@@ -134,6 +138,7 @@ export default function TvPage() {
           name: editor.name.trim(),
           departments: editor.departments,
           competence: editor.competence,
+          followCurrent: editor.followCurrent,
         });
       setEditor(undefined);
       await devices.refetch();
@@ -350,7 +355,11 @@ export default function TvPage() {
                     {device.departments.join(" · ")}
                     <br />
                     Competência{" "}
-                    {device.competence.split("-").reverse().join("/")} ·{" "}
+                    {tvCompetence(device, data.now)
+                      .split("-")
+                      .reverse()
+                      .join("/")}
+                    {device.followCurrent === false ? " (fixa)" : " (atual)"} ·{" "}
                     {device.blocks.length} blocos
                     <br />
                     {device.showNames ? "Nomes visíveis" : "Nomes ocultos"} ·
@@ -459,15 +468,27 @@ export default function TvPage() {
                 ))}
               </div>
             </fieldset>
-            <label>
-              Competência
-              <CompetencePicker
-                value={editor.competence}
-                onValueChange={(value) =>
-                  setEditor({ ...editor, competence: value })
+            <label className="checkbox-field">
+              <input
+                type="checkbox"
+                checked={editor.followCurrent}
+                onChange={(event) =>
+                  setEditor({ ...editor, followCurrent: event.target.checked })
                 }
               />
+              Acompanhar a competência em andamento (muda sozinha a cada mês)
             </label>
+            {!editor.followCurrent && (
+              <label>
+                Competência fixa
+                <CompetencePicker
+                  value={editor.competence}
+                  onValueChange={(value) =>
+                    setEditor({ ...editor, competence: value })
+                  }
+                />
+              </label>
+            )}
             {editor.device && (
               <>
                 <fieldset disabled={busy}>

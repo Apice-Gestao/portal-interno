@@ -343,6 +343,9 @@ export interface Task {
 
   cancelled?: boolean;
 
+  /** Status held when the task was cancelled; reopening restores it. */
+  cancelledFromStatus?: TaskStatus;
+
   id: string;
 
   tenantId: string;
@@ -456,6 +459,7 @@ export type TaskCommand =
         | "return"
         | "wait"
         | "request_dispense"
+        | "deny_dispense"
         | "dispense"
         | "reopen"
         | "cancel"
@@ -653,6 +657,7 @@ export interface TransferCompanies {
   target: CompanyResponsibility;
   transferOpenTasks: boolean;
   expectedRevisions: Record<string, number>;
+  effectiveCompetence?: string;
 }
 
 export interface CreateTemplate {
@@ -697,6 +702,9 @@ export interface CreateTask {
   assigneeId: string;
 
   requiresReview: boolean;
+
+  /** Defaults to the current month in Brasília. */
+  competence?: string;
 }
 
 export interface PortalRepository {

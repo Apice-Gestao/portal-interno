@@ -2,7 +2,6 @@ import { SelectField } from "../../shared/ui/SelectField";
 import { useState } from "react";
 import type { FormEvent } from "react";
 import {
-  businessDate,
   canExecute,
   hasPermission,
   suggestedDeadlines,
@@ -10,7 +9,7 @@ import {
 } from "@apice/domain";
 import { usePortal } from "../../app/usePortal";
 import { Busy, FormError, Modal } from "../../shared/ui/components";
-import { DatePicker } from "../../shared/ui/CompetencePicker";
+import { CompetencePicker, DatePicker } from "../../shared/ui/CompetencePicker";
 export function NewTaskModal({
   open,
   onOpenChange,
@@ -18,8 +17,19 @@ export function NewTaskModal({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { actor, data, department, client, refresh, notify, setCompetence } =
-    usePortal();
+  const {
+    actor,
+    data,
+    department,
+    client,
+    refresh,
+    notify,
+    competence,
+    setCompetence,
+  } = usePortal();
+  // The task lands in the competence open on screen, so whoever opens the
+  // portal on it finds the task (19/10/2026).
+  const [taskCompetence, setTaskCompetence] = useState(competence);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const canCreate = hasPermission(actor, "tasks.create");
@@ -43,6 +53,7 @@ export function NewTaskModal({
       internalDue: form.get("internalDue"),
       legalDue: form.get("legalDue"),
       requiresReview: form.get("requiresReview") === "on",
+      competence: taskCompetence,
     });
     if (!result.success) {
       setError(result.error.issues[0]?.message ?? "Revise os campos.");
@@ -53,7 +64,7 @@ export function NewTaskModal({
     try {
       await client.addTask(result.data);
       await refresh();
-      setCompetence(businessDate(data.now).slice(0, 7));
+      setCompetence(taskCompetence);
       onOpenChange(false);
       notify("Tarefa avulsa criada e atribuída.");
     } catch (e) {
@@ -110,6 +121,13 @@ export function NewTaskModal({
                 </option>
               ))}
           </SelectField>
+        </label>
+        <label>
+          Competência
+          <CompetencePicker
+            value={taskCompetence}
+            onValueChange={setTaskCompetence}
+          />
         </label>
         <label>
           Meta interna

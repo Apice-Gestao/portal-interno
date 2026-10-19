@@ -2,6 +2,10 @@
 
 Data: 17/10/2026. Este documento preserva o checkpoint original e as retomadas. **Estado atual:** 31 relatórios entregues na demonstração pelo Claude Code e auditados pelo Codex. As seções antigas que dizem faltar a interface são históricas; não reiniciar implementação com base nelas. Revisão integrada e pendências atuais em `AUDITORIA-INTEGRADA-2026-10-17.md`.
 
+## Correções da auditoria de lógica — Claude Code — 19/10/2026
+
+Catálogo passa de 31 para **32** relatórios: novo **Pendências de pessoas desativadas** (`inactive-owners`, categoria Gestão, exige `reports.view` + `tasks.assign`, sem recorte de datas). Lista tarefas abertas, carteiras e etapas de implantação com responsável desativado, removido ou fora do setor. **Entregas por colaborador**: “Atividades” deixou de contar canceladas (coluna “Canceladas” continua). Detalhes e demais correções em `docs/AUDITORIA-LOGICA-2026-10-19.md`.
+
 ## Auditoria da retomada pelo Codex — 17/10/2026
 
 Relatórios mantêm os seis principais e 31 opções no total. Corrigidos recorte departamental de propostas em “Todos”, prazo comparado em dia UTC diferente do dia local, exportação/impressão de resultado com filtros não aplicados/erro/carregamento e registro completo do recorte impresso. Datas e versões documentais usam funções compartilhadas do domínio, evitando divergência com conclusão da tarefa. Filtro de regime rotulado como cadastro atual; histórico tributário não é recomposto por ele.

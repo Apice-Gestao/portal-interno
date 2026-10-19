@@ -158,7 +158,13 @@ export interface PortalClient {
   generate(
     competence: string,
     department: Department,
-  ): Promise<{ created: number; existing: number; blocked?: number }>;
+  ): Promise<{
+    created: number;
+    existing: number;
+    blocked?: number;
+    /** Companies left out for lack of a valid responsible. */
+    skipped?: string[];
+  }>;
   logout(): Promise<void>;
   addTask(input: CreateTask): Promise<Task>;
   importCompanies(
@@ -259,7 +265,13 @@ function usableDemoState(saved: string | null): PortalState | undefined {
   if (!saved) return undefined;
   try {
     const state = JSON.parse(saved) as PortalState;
-    const lists = ["users", "companies", "templates", "tasks", "audit"] as const;
+    const lists = [
+      "users",
+      "companies",
+      "templates",
+      "tasks",
+      "audit",
+    ] as const;
     if (!lists.every((key) => Array.isArray(state?.[key]))) return undefined;
     const admin = state.users.find((user) => user?.role === "admin");
     if (!admin?.userId || !admin.tenantId) return undefined;
@@ -347,6 +359,7 @@ export class DemoPortalClient implements PortalClient {
         name: "Prévia do painel",
         departments,
         competence,
+        followCurrent: false,
         showNames: false,
       }),
       DEMO_NOW,
@@ -504,7 +517,8 @@ export class DemoPortalClient implements PortalClient {
         userId: `demo-${crypto.randomUUID().slice(0, 8)}`,
         tenantId: actor.tenantId,
         name,
-        initials: `${words[0]![0] ?? ""}${words.length > 1 ? (words.at(-1)![0] ?? "") : ""}`.toUpperCase(),
+        initials:
+          `${words[0]![0] ?? ""}${words.length > 1 ? (words.at(-1)![0] ?? "") : ""}`.toUpperCase(),
         role: input.role,
         departments: [...input.departments],
         permissions: [...input.permissions],
@@ -599,13 +613,19 @@ export class DemoPortalClient implements PortalClient {
       .join("");
     if (DemoPortalClient.storedBytes + file.size > 32 * 1024 * 1024)
       throw new DomainError("STORAGE_LIMIT", "Limite da prévia atingido.", 413);
-    const task = sharedEngine.attach(this.user(), id, revision, {
-      ...metadata,
-      name: file.name,
-      bytes: bytes.length,
-      kind,
-      hash,
-    });
+    const task = sharedEngine.attach(
+      this.user(),
+      id,
+      revision,
+      {
+        ...metadata,
+        name: file.name,
+        bytes: bytes.length,
+        kind,
+        hash,
+      },
+      bytes,
+    );
     const documentId = task.documents.at(-1)!.id;
     DemoPortalClient.files.set(documentId, file);
     DemoPortalClient.storedBytes += file.size;

@@ -58,6 +58,8 @@ export const commandSchema = z.discriminatedUnion("type", [
 
         "request_dispense",
 
+        "deny_dispense",
+
         "dispense",
 
         "reopen",
@@ -456,6 +458,9 @@ export const taskSchema = z
     assigneeId: z.string().min(1).max(80),
 
     requiresReview: z.boolean(),
+
+    // Competence the one-off task belongs to; defaults to the current month.
+    competence: competenceSchema.optional(),
   })
 
   .strict()
@@ -527,6 +532,9 @@ export const transferCompaniesSchema = z
     target: companyResponsibilitySchema,
     transferOpenTasks: z.boolean(),
     expectedRevisions: z.record(z.string().min(1).max(80), version),
+    // First competence served by the new responsible; defaults to the closed
+    // competence, the one being worked in the current month (L04).
+    effectiveCompetence: competenceSchema.optional(),
   })
   .strict();
 const entryId = z

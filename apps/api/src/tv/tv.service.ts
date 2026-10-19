@@ -10,7 +10,7 @@ import {
 } from "@nestjs/common";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
-import { createTvFeed, TV_DEFAULT_BLOCKS } from "@apice/domain";
+import { createTvFeed, tvCompetence, TV_DEFAULT_BLOCKS } from "@apice/domain";
 import type {
   Actor,
   CreateTvDevice,
@@ -352,7 +352,11 @@ export class TVService {
     };
     const tasks = await client.query<{ payload: Task }>(
       "SELECT payload FROM portal.tasks WHERE tenant_id=$1 AND competence=$2 AND department=ANY($3::text[])",
-      [device.tenantId, device.competence, device.departments],
+      [
+        device.tenantId,
+        tvCompetence(device, operationalNow()),
+        device.departments,
+      ],
     );
     state.tasks = tasks.rows.map((row) => ({ ...row.payload, documents: [] }));
     const companies = await client.query<{
@@ -402,6 +406,8 @@ export class TVService {
         name: "Prévia do painel",
         departments,
         competence,
+        // The preview shows exactly the competence chosen on screen.
+        followCurrent: false,
         active: true,
         showNames: false,
         blocks: this.defaultBlocks(resolved),

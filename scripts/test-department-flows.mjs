@@ -1033,7 +1033,7 @@ try {
     },
   );
   await check(
-    "propostas preservam vigência, recusam aprovação desatualizada e permitem rejeição",
+    "propostas preservam vigência, aprovam após edição simples sem sobrescrever e permitem rejeição",
     async () => {
       const input = {
         companyId: queueCompany.id,
@@ -1068,18 +1068,34 @@ try {
         operatorToken,
         { expectedRevision: stale.revision, decision: "approve" },
       ).expect(403);
-      await api(
-        "post",
-        `/company-change-proposals/${stale.id}/decision`,
-        adminToken,
-        { expectedRevision: stale.revision, decision: "approve" },
-      ).expect(409);
-      const rejected = (
+      // L07 (19/10/2026): the decision recomputes the impact on the current
+      // company, so a simple edit no longer locks the pending proposal.
+      const afterEdit = (
         await api(
           "post",
           `/company-change-proposals/${stale.id}/decision`,
           adminToken,
-          { expectedRevision: stale.revision, decision: "reject" },
+          { expectedRevision: stale.revision, decision: "approve" },
+        ).expect(201)
+      ).body;
+      assert.equal(afterEdit.status, "approved");
+      queueCompany = (await snapshot()).companies.find(
+        (c) => c.id === queueCompany.id,
+      );
+      assert.deepEqual(queueCompany.tags, ["Cadastro alterado após proposta"]);
+      const toReject = (
+        await api("post", "/companies/change-proposals", adminToken, {
+          ...input,
+          expectedRevision: queueCompany.revision,
+          patch: { regime: "Lucro Real" },
+        }).expect(201)
+      ).body;
+      const rejected = (
+        await api(
+          "post",
+          `/company-change-proposals/${toReject.id}/decision`,
+          adminToken,
+          { expectedRevision: toReject.revision, decision: "reject" },
         ).expect(201)
       ).body;
       assert.equal(rejected.status, "rejected");
@@ -1125,6 +1141,11 @@ try {
         companyAtCompetence(raw, "2026-12").regime,
         "Lucro Presumido",
       );
+      // L06: a future competence is created by the generation, once.
+      await api("post", "/generation", adminToken, {
+        competence: "2026-12",
+        department: "Fiscal",
+      }).expect(201);
       const count = (await snapshot()).tasks.filter(
         (t) => t.companyId === queueCompany.id && t.competence === "2026-12",
       ).length;
@@ -1628,11 +1649,11 @@ try {
     );
   }
   await check(
-    "todos os 31 relatórios consultam dados conectados sem gravar e negam departamento externo",
+    "todos os 32 relatórios consultam dados conectados sem gravar e negam departamento externo",
     async () => {
       await restartTestApi();
       const before = await snapshot();
-      assert.equal(REPORT_DEFINITIONS.length, 31);
+      assert.equal(REPORT_DEFINITIONS.length, 32);
       const companyIds = new Set(before.companies.map((item) => item.id));
       const taskIds = new Set(before.tasks.map((item) => item.id));
       for (const definition of REPORT_DEFINITIONS) {

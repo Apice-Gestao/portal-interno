@@ -40,6 +40,7 @@ type ReasonAction =
   | "return"
   | "wait"
   | "request_dispense"
+  | "deny_dispense"
   | "dispense"
   | "reopen"
   | "cancel"
@@ -48,6 +49,7 @@ const reasonTitles = {
   return: "Devolver para correção",
   wait: "Registrar espera pelo cliente",
   request_dispense: "Solicitar dispensa",
+  deny_dispense: "Negar dispensa",
   dispense: "Aprovar dispensa",
   reopen: "Reabrir tarefa",
   cancel: "Cancelar tarefa",
@@ -592,26 +594,35 @@ export function TaskDrawer({
                         </div>
                       </div>
                     )}
-                    {task.dispenseRequested && (
-                      <div className="info-box warning-box">
-                        <ClockIcon size={18} />
-                        <div>
-                          <strong>Dispensa aguardando aprovação</strong>
-                          <p>
-                            Um coordenador deve analisar a justificativa no
-                            histórico.
-                          </p>
-                          {canDispense && (
-                            <button
-                              className="text-button"
-                              onClick={() => setAction("dispense")}
-                            >
-                              Analisar dispensa
-                            </button>
-                          )}
+                    {task.dispenseRequested &&
+                      !["done", "dispensed"].includes(task.status) && (
+                        <div className="info-box warning-box">
+                          <ClockIcon size={18} />
+                          <div>
+                            <strong>Dispensa aguardando aprovação</strong>
+                            <p>
+                              Um coordenador deve analisar a justificativa no
+                              histórico.
+                            </p>
+                            {canDispense && (
+                              <>
+                                <button
+                                  className="text-button"
+                                  onClick={() => setAction("dispense")}
+                                >
+                                  Aprovar dispensa
+                                </button>
+                                <button
+                                  className="text-button"
+                                  onClick={() => setAction("deny_dispense")}
+                                >
+                                  Negar dispensa
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
                   </>
                 )}
                 {tab === "documents" && (

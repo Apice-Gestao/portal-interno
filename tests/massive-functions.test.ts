@@ -52,6 +52,9 @@ const tvDevice: TvDevice = {
   name: "Simulação de teste",
   departments: [...admin.departments],
   competence: "2026-10",
+  // Pinned: the populations are built for this competence (devices follow
+  // the competence in progress by default since 19/10/2026).
+  followCurrent: false,
   active: true,
   showNames: false,
   blocks: ["progress", "deadlines", "collaborators", "deliveries"],

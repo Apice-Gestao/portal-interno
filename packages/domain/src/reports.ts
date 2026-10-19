@@ -325,6 +325,15 @@ export const REPORT_DEFINITIONS = [
     { dateBases: ["recordedAt"], regime: false, status: false },
   ),
   definition(
+    "inactive-owners",
+    "Pendências de pessoas desativadas",
+    "Tarefas, carteiras e etapas com responsável sem acesso.",
+    "management",
+    "recordedAt",
+    ["tasks.assign"],
+    { dateBases: [], regime: false, status: false },
+  ),
+  definition(
     "user-access",
     "Acessos dos usuários",
     "Permissões concedidas e departamentos.",
@@ -860,7 +869,8 @@ export function buildReport(
         id: owner,
         cells: {
           owner: ownerName(owner),
-          total: items.length,
+          // Cancelled tasks are out of the operational population (L09).
+          total: items.filter((task) => !task.cancelled).length,
           done: items.filter(
             (task) => !task.cancelled && task.status === "done",
           ).length,
@@ -881,7 +891,7 @@ export function buildReport(
       });
     }
     notes.push(
-      "Totais por responsável atual da atividade; não representam horas trabalhadas, qualidade fiscal ou avaliação automática de pessoas. % na meta = entregas concluídas até a meta interna ÷ entregas concluídas.",
+      "Totais por responsável atual da atividade; não representam horas trabalhadas, qualidade fiscal ou avaliação automática de pessoas. % na meta = entregas concluídas até a meta interna ÷ entregas concluídas. Atividades não incluem canceladas, que aparecem na coluna própria.",
     );
   } else if (filters.id === "changes" || filters.id === "activity") {
     setColumns([
@@ -1416,6 +1426,130 @@ export function buildReport(
     descending = true;
     notes.push(
       "O filtro de responsável representa o autor da proposta. Impactos são os registrados na proposta, sem executar ou aprovar alterações por este relatório.",
+    );
+  } else if (filters.id === "inactive-owners") {
+    // Work left with people who were deactivated or lost the sector (L03).
+    const allUsers = new Map(
+      snapshot.users
+        .filter((user) => user.tenantId === actor.tenantId)
+        .map((user) => [user.userId, user]),
+    );
+    const unavailable = (userId: string | undefined, department: string) => {
+      if (!userId || userId.startsWith("department:")) return false;
+      const user = allUsers.get(userId);
+      return (
+        !user || user.active === false || !user.departments.includes(department)
+      );
+    };
+    const personName = (userId: string) =>
+      allUsers.get(userId)?.name ?? "Pessoa removida";
+    setColumns([
+      ["kind", "Pendência"],
+      ["person", "Pessoa sem acesso"],
+      ["company", "Empresa"],
+      ["department", "Departamento"],
+      ["item", "Item"],
+      ["situation", "Situação"],
+    ]);
+    const push = (row: ReportRow, key: string) => {
+      sortKeys.set(row.id, key);
+      rows.push(row);
+    };
+    for (const task of visibleTasks)
+      if (
+        isOpen(task) &&
+        (!filters.companyId || task.companyId === filters.companyId) &&
+        (!filters.ownerId || task.assigneeId === filters.ownerId) &&
+        unavailable(task.assigneeId, task.department)
+      )
+        push(
+          {
+            id: `task:${task.id}`,
+            taskId: task.id,
+            companyId: task.companyId,
+            department: task.department,
+            competence: task.competence,
+            tones: { situation: deadline(task, today).tone },
+            cells: {
+              kind: "Tarefa aberta",
+              person: personName(task.assigneeId),
+              company: companyName(task.companyId),
+              department: departmentName(task.department),
+              item: `${task.title} · ${task.competence}`,
+              situation: deadline(task, today).label,
+            },
+          },
+          `${personName(task.assigneeId)}|1|${task.legalDue}`,
+        );
+    for (const company of companyMap.values()) {
+      if (filters.companyId && company.id !== filters.companyId) continue;
+      for (const department of departments) {
+        const responsibility = company.responsibilities?.[department];
+        const userId =
+          responsibility?.mode === "person"
+            ? responsibility.userId
+            : !responsibility &&
+                allUsers.get(company.ownerId)?.departments.includes(department)
+              ? company.ownerId
+              : undefined;
+        if (
+          !userId ||
+          (filters.ownerId && userId !== filters.ownerId) ||
+          !unavailable(userId, department)
+        )
+          continue;
+        push(
+          {
+            id: `company:${company.id}:${department}`,
+            companyId: company.id,
+            department,
+            cells: {
+              kind: "Carteira",
+              person: personName(userId),
+              company: company.name,
+              department: departmentName(department),
+              item: "Responsável pela carteira",
+              situation: "Transferir a carteira",
+            },
+          },
+          `${personName(userId)}|2|${company.name}`,
+        );
+      }
+    }
+    for (const process of snapshot.companyOnboardings)
+      if (
+        process.tenantId === actor.tenantId &&
+        process.status === "active" &&
+        (!filters.companyId || process.companyId === filters.companyId)
+      )
+        for (const stage of process.stages)
+          if (
+            stage.status !== "done" &&
+            inDepartment(stage.department) &&
+            (!filters.ownerId || stage.assigneeId === filters.ownerId) &&
+            unavailable(stage.assigneeId, stage.department)
+          )
+            push(
+              {
+                id: `stage:${process.id}:${stage.id}`,
+                companyId: process.companyId,
+                department: stage.department,
+                cells: {
+                  kind: "Etapa de implantação",
+                  person: personName(stage.assigneeId),
+                  company: companyName(process.companyId),
+                  department: departmentName(stage.department),
+                  item: `${process.flowTitle} · ${stage.title}`,
+                  situation:
+                    stage.status === "active"
+                      ? "Etapa em andamento"
+                      : "Trocar o responsável antes da entrega",
+                },
+              },
+              `${personName(stage.assigneeId)}|3|${stage.title}`,
+            );
+    notes.push(
+      "Lista o que ficou com pessoas desativadas, removidas ou fora do departamento. Use a transferência de tarefas, de carteira ou a troca de responsáveis da implantação.",
     );
   } else if (filters.id === "user-access") {
     setColumns([

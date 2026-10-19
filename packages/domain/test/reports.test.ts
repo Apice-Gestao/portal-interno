@@ -53,9 +53,9 @@ const reload = () => {
 };
 
 describe("report catalog and authorization", () => {
-  it("keeps 31 unique reports with the six essentials first", () => {
+  it("keeps 32 unique reports with the six essentials first", () => {
     const list = REPORT_DEFINITIONS.map((item) => item.id);
-    expect(new Set(list).size).toBe(31);
+    expect(new Set(list).size).toBe(32);
     expect(list.slice(0, 6)).toEqual([
       "reconciliation",
       "deliveries",
@@ -79,6 +79,7 @@ describe("report catalog and authorization", () => {
     expect(base).not.toContain("company-changes");
     expect(base).not.toContain("activity");
     expect(base).not.toContain("user-access");
+    expect(base).not.toContain("inactive-owners");
     expect(base).toContain("pending");
     const granted = availableReports(
       reporter(

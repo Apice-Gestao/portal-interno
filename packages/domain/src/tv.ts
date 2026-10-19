@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { generationSchema, departmentSchema } from "./schemas.js";
 import { businessDate } from "./dates.js";
+import { closedCompetence } from "./automation.js";
 import { deadline, metric } from "./selectors.js";
 import type { Department, PortalState, Task } from "./types.js";
 
@@ -27,6 +28,11 @@ export interface TvDevice {
   name: string;
   departments: Department[];
   competence: string;
+  /**
+   * Follows the competence being worked on in Brasília (the one just closed)
+   * unless set to false, when `competence` stays pinned (19/10/2026).
+   */
+  followCurrent?: boolean;
   active: boolean;
   showNames: boolean;
   blocks: TvBlock[];
@@ -40,6 +46,17 @@ export interface CreateTvDevice {
   name: string;
   departments: Department[];
   competence: string;
+  followCurrent?: boolean;
+}
+
+/** Competence a device shows right now. */
+export function tvCompetence(
+  device: Pick<TvDevice, "competence" | "followCurrent">,
+  now: string,
+) {
+  return device.followCurrent === false
+    ? device.competence
+    : closedCompetence(now);
 }
 
 export interface UpdateTvDevice {
@@ -48,6 +65,7 @@ export interface UpdateTvDevice {
   name?: string;
   departments?: Department[];
   competence?: string;
+  followCurrent?: boolean;
   showNames?: boolean;
   blocks?: TvBlock[];
   rotationSeconds?: number;
@@ -74,6 +92,7 @@ export const createTvDeviceSchema = z
     name: deviceName,
     departments,
     competence: generationSchema.shape.competence,
+    followCurrent: z.boolean().optional(),
   })
   .strict();
 
@@ -84,6 +103,7 @@ export const updateTvDeviceSchema = z
     name: deviceName.optional(),
     departments: departments.optional(),
     competence: generationSchema.shape.competence.optional(),
+    followCurrent: z.boolean().optional(),
     showNames: z.boolean().optional(),
     blocks: blocks.optional(),
     rotationSeconds: z.number().int().min(5).max(60).optional(),
@@ -194,12 +214,13 @@ export function createTvFeed(
   now: string,
 ): TvFeed {
   const today = businessDate(now);
+  const competence = tvCompetence(device, now);
   const tasks = state.tasks.filter(
     (task) =>
       task.tenantId === device.tenantId &&
       !task.cancelled &&
       device.departments.includes(task.department) &&
-      task.competence === device.competence,
+      task.competence === competence,
   );
   const companies = new Map(
     state.companies
@@ -216,9 +237,11 @@ export function createTvFeed(
   );
   const usersById = new Map(users.map((user) => [user.userId, user]));
   const responsibleLabel = (task: Task) =>
-    device.blocks.includes("collaborators")
-      ? (usersById.get(task.assigneeId)?.name ?? "Responsável indisponível")
-      : "Equipe";
+    !device.blocks.includes("collaborators")
+      ? "Equipe"
+      : task.assigneeId === `department:${task.department}`
+        ? `Fila · ${task.department}`
+        : (usersById.get(task.assigneeId)?.name ?? "Responsável indisponível");
   const assigned = new Map<string, Task[]>();
   for (const task of tasks) {
     const list = assigned.get(task.assigneeId) ?? [];
@@ -347,7 +370,7 @@ export function createTvFeed(
     device: {
       name: device.name,
       departments: [...device.departments],
-      competence: device.competence,
+      competence,
       blocks: [...device.blocks],
       rotationSeconds: device.rotationSeconds,
       showNames: device.showNames,

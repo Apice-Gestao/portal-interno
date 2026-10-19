@@ -232,9 +232,9 @@ describe("reports and automatic generation (R04, A01)", () => {
     expect(notices()).toBe(1);
     engine.autoGenerate(admin.tenantId, "2026-11");
     expect(notices()).toBe(1);
-    // Manual generation still refuses and explains.
-    expect(() => engine.generate(admin, "2026-12", "Fiscal")).toThrow(
-      expect.objectContaining({ code: "NO_OWNER" }),
+    // Manual generation also skips and names it since 19/10/2026.
+    expect(engine.generate(admin, "2026-12", "Fiscal").skipped).toContain(
+      broken.name,
     );
   });
 });

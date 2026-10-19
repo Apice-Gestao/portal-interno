@@ -203,6 +203,39 @@ function AccountEditor({
     localTest && !!user && ["helena", "julia"].includes(user.userId);
   // Test accounts and the hosted preview's fictitious ones may have no e-mail.
   const fictitious = localTest || isHostedDemo;
+  // What stays with this person if the account is deactivated (L03).
+  const [activeChecked, setActiveChecked] = useState(user?.active !== false);
+  const pending = user
+    ? {
+        tasks: data.tasks.filter(
+          (task) =>
+            task.assigneeId === user.userId &&
+            !task.cancelled &&
+            !["done", "dispensed"].includes(task.status),
+        ).length,
+        companies: data.companies.filter(
+          (company) =>
+            company.ownerId === user.userId ||
+            Object.values(company.responsibilities ?? {}).some(
+              (item) => item.mode === "person" && item.userId === user.userId,
+            ),
+        ).length,
+        stages: (data.companyOnboardings ?? []).reduce(
+          (sum, onboarding) =>
+            sum +
+            (onboarding.status === "active"
+              ? onboarding.stages.filter(
+                  (stage) =>
+                    stage.status !== "done" &&
+                    stage.assigneeId === user.userId,
+                ).length
+              : 0),
+          0,
+        ),
+      }
+    : undefined;
+  const leftBehind =
+    pending && pending.tasks + pending.companies + pending.stages > 0;
   const [role, setRole] = useState<Role>(user?.role ?? "operator");
   const [homeView, setHomeView] = useState<HomeView>(
     user?.homeView ?? "personal",
@@ -442,10 +475,40 @@ function AccountEditor({
                 name="active"
                 type="checkbox"
                 defaultChecked={user.active}
+                onChange={(event) => setActiveChecked(event.target.checked)}
               />
               <span>Usuário ativo</span>
             </label>
             <p>Desativar bloqueia o acesso e preserva o histórico.</p>
+            {!activeChecked && leftBehind && (
+              <div className="info-box warning-box account-pending" role="status">
+                <strong>Antes de desativar, redistribua o que está com {user.name}</strong>
+                <ul>
+                  {pending.tasks > 0 && (
+                    <li>
+                      {pending.tasks} {pending.tasks === 1 ? "tarefa aberta" : "tarefas abertas"} ·
+                      transfira em Tarefas › Transferir atividades
+                    </li>
+                  )}
+                  {pending.companies > 0 && (
+                    <li>
+                      {pending.companies} {pending.companies === 1 ? "empresa na carteira" : "empresas na carteira"} ·
+                      transfira em Empresas e carteira
+                    </li>
+                  )}
+                  {pending.stages > 0 && (
+                    <li>
+                      {pending.stages} {pending.stages === 1 ? "etapa de implantação" : "etapas de implantação"} ·
+                      troque o responsável em Fluxos e processos
+                    </li>
+                  )}
+                </ul>
+                <p>
+                  Sem isso as tarefas ficam paradas com a pessoa (a Central do
+                  gestor as sinaliza) e a geração mensal pula essas empresas.
+                </p>
+              </div>
+            )}
           </div>
         )}
         <FormError message={error} />

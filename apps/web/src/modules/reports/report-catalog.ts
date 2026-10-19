@@ -81,6 +81,7 @@ export const reportIcons: Record<ReportId, typeof AnalyticsIcon> = {
   comments: NotificationIcon,
   "company-changes": ChangeReviewIcon,
   activity: OfficeSettingsIcon,
+  "inactive-owners": TransferIcon,
   "user-access": UserAccessIcon,
   "department-structure": DepartmentFlowIcon,
 };
