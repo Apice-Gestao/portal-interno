@@ -172,3 +172,241 @@
     flex-direction: column;
   }
 }
+
+/* Visual flow — 17/10/2026 (Claude Code). */
+.workflow-flow {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.workflow-terminal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  align-self: center;
+  padding: 7px 16px;
+  border-radius: 999px;
+  background: color-mix(in srgb, #16afc4 12%, white);
+  color: #0e7f87;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.workflow-terminal.is-end {
+  background: #0e7f87;
+  color: white;
+}
+.workflow-connector {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 42px;
+}
+/* The line that links one card to the next, with the insert button on top. */
+.workflow-connector::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: color-mix(in srgb, #16afc4 45%, white);
+}
+.workflow-connector::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  border: 5px solid transparent;
+  border-top-color: color-mix(in srgb, #16afc4 70%, white);
+  transform: translate(-50%, 4px);
+}
+.workflow-insert {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1.5px solid color-mix(in srgb, #16afc4 55%, white);
+  border-radius: 50%;
+  background: white;
+  color: #0e7f87;
+  opacity: 0.75;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease,
+    background-color 0.15s ease;
+}
+.workflow-insert:hover:not(:disabled),
+.workflow-insert:focus-visible {
+  opacity: 1;
+  transform: scale(1.15);
+  background: #0e7f87;
+  color: white;
+}
+.workflow-flow > .workflow-editor-step {
+  grid-template-columns: 20px 28px minmax(0, 1fr) auto;
+  padding: 10px 10px 10px 8px;
+  border-radius: 14px;
+  background: white;
+  box-shadow: 0 6px 16px -12px rgb(14 127 135 / 0.6);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    opacity 0.15s ease;
+}
+.workflow-flow > .workflow-editor-step:hover {
+  border-color: color-mix(in srgb, #16afc4 45%, white);
+}
+.workflow-flow > .workflow-editor-step.is-dragging {
+  opacity: 0.45;
+}
+.workflow-flow > .workflow-editor-step.is-target {
+  border-color: #0e7f87;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #16afc4 30%, transparent);
+}
+.workflow-drag {
+  display: grid;
+  place-items: center;
+  color: color-mix(in srgb, #15202b 40%, white);
+  cursor: grab;
+}
+.workflow-flow .workflow-step-number {
+  width: 28px;
+  height: 28px;
+  background: #0e7f87;
+  color: white;
+  font-weight: 700;
+}
+/* Inline rename: the step title reads as text and turns into a field on hover/focus. */
+.workflow-flow .workflow-step-field input {
+  width: 100%;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #15202b;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+.workflow-flow .workflow-step-field input:hover:not(:disabled) {
+  border-color: color-mix(in srgb, #16afc4 30%, white);
+}
+.workflow-flow .workflow-step-field input:focus {
+  border-color: #16afc4;
+  background: color-mix(in srgb, #16afc4 5%, white);
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #16afc4 22%, transparent);
+}
+.workflow-flow .workflow-step-field input::placeholder {
+  color: color-mix(in srgb, #15202b 40%, white);
+  font-weight: 500;
+}
+@media (prefers-reduced-motion: reduce) {
+  .workflow-insert,
+  .workflow-flow > .workflow-editor-step {
+    transition: none;
+  }
+}
+
+/* Company-specific steps — 17/10/2026 (Claude Code). */
+.model-custom-count {
+  display: block;
+  margin-top: 10px;
+  text-align: center;
+  color: #0e7f87;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.company-workflows {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid color-mix(in srgb, #16afc4 18%, white);
+}
+.company-workflows-head {
+  text-align: center;
+}
+.company-workflows-head h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+.company-workflows-head p {
+  margin: 4px 0 0;
+  color: color-mix(in srgb, #15202b 60%, white);
+  font-size: 0.8rem;
+}
+.company-workflow-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.company-workflow-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, #16afc4 22%, white);
+  border-radius: 12px;
+  background: color-mix(in srgb, #16afc4 5%, white);
+}
+.company-workflow-list li.is-outdated {
+  border-color: #e0b13a;
+  background: #fff9e8;
+}
+.company-workflow-info {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.company-workflow-info > span {
+  color: color-mix(in srgb, #15202b 60%, white);
+  font-size: 0.75rem;
+}
+.company-workflow-info > .company-workflow-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #8a6100;
+  font-weight: 600;
+}
+.company-workflow-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.company-workflow-actions .button {
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 0.75rem;
+}
+.company-workflow-add {
+  justify-self: center;
+}
+.company-workflow-form {
+  display: grid;
+  gap: 16px;
+}
+@media (max-width: 600px) {
+  .workflow-flow > .workflow-editor-step {
+    grid-template-columns: 16px 28px minmax(0, 1fr);
+    row-gap: 4px;
+  }
+  .workflow-flow .workflow-step-actions {
+    grid-column: 1 / -1;
+    justify-self: center;
+  }
+}

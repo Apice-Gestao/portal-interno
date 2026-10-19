@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { randomUUID, randomBytes } from "node:crypto";
-import { existsSync, writeFileSync, mkdirSync, unlinkSync } from "node:fs";
+import {
+  existsSync,
+  writeFileSync,
+  mkdirSync,
+  unlinkSync,
+  rmSync,
+} from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -45,6 +51,8 @@ const stopped = new Promise((resolve) => {
 });
 const children = [];
 const controlFile = path.join(root, ".local", "auth-test-control.json");
+// Verification codes go to a private local mailbox the browser test reads.
+const mailDirectory = `.local/auth-test-mail-${suffix}`;
 const controlToken = randomBytes(32).toString("hex");
 const control = createServer(async (req, res) => {
   if (
@@ -145,7 +153,8 @@ async function waitForApi() {
       if (response.ok) {
         const health = await response.json();
         assert.equal(health.persistence, "postgres");
-        assert.equal(health.authentication, "password");
+        // Password login, with the e-mail second factor when configured.
+        assert.match(health.authentication, /^password(\+email-mfa)?$/);
         return;
       }
     } catch {
@@ -164,7 +173,7 @@ try {
   mkdirSync(path.dirname(controlFile), { recursive: true });
   writeFileSync(
     controlFile,
-    JSON.stringify({ token: controlToken, port: 5185, database }),
+    JSON.stringify({ token: controlToken, port: 5185, database, mailDirectory }),
     { mode: 0o600 },
   );
   await adminPool.query(`CREATE DATABASE ${pg.escapeIdentifier(database)}`);
@@ -207,6 +216,9 @@ try {
     PORTAL_API_PORT: "3002",
     API_PROXY_TARGET: "http://127.0.0.1:3002",
     PORTAL_WEB_ORIGIN: "http://127.0.0.1:5175",
+    MAIL_DELIVERY: "local",
+    MAIL_OUTBOX_DIR: mailDirectory,
+    MFA_SECRET: randomBytes(32).toString("hex"),
   };
   for (const key of [
     "MIGRATION_DATABASE_URL",
@@ -239,4 +251,5 @@ try {
   await cleanup();
   control.close();
   if (existsSync(controlFile)) unlinkSync(controlFile);
+  rmSync(path.join(root, mailDirectory), { recursive: true, force: true });
 }

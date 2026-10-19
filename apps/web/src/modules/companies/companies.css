@@ -1,0 +1,539 @@
+.company-filters {
+  flex-wrap: wrap;
+}
+.company-filters .search-field {
+  flex: 1 1 280px;
+}
+.company-filters > .select-field {
+  flex: 1 1 170px;
+  max-width: 240px;
+}
+.company-selection {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-wrap: wrap;
+  padding: 15px 22px;
+  background: var(--soft);
+  border-top: 1px solid var(--line);
+}
+.company-selection strong {
+  font-size: 0.85rem;
+  color: var(--teal);
+}
+.company-owners {
+  display: grid;
+  gap: 6px;
+  padding: 5px 0;
+  font-size: 0.73rem;
+}
+.company-owners strong {
+  display: inline-block;
+  min-width: 70px;
+  color: var(--muted);
+  font-weight: 500;
+}
+.company-tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 7px;
+}
+.company-tags span {
+  font-size: 0.68rem;
+  color: var(--teal);
+  background: var(--soft);
+  border-radius: 4px;
+  padding: 3px 6px;
+}
+.company-editor-fieldset {
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.company-sector-editor {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 18px;
+}
+.company-sector-editor h3,
+.company-impact-note h3 {
+  font-size: 0.91rem;
+  margin-bottom: 8px;
+}
+.company-sector-row {
+  display: grid;
+  grid-template-columns: minmax(80px, 0.6fr) 1fr 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+.company-sector-row > strong {
+  font-size: 0.81rem;
+}
+.company-impact-note {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 0.83rem;
+  line-height: 1.6;
+}
+.company-impact-note label {
+  display: grid;
+  gap: 8px;
+}
+.company-impact-note .checkbox-field {
+  display: flex;
+}
+.company-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin: 0 0 25px;
+}
+.company-detail-grid dt {
+  font-size: 0.74rem;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+.company-detail-grid dd {
+  margin: 0;
+  font-size: 0.87rem;
+}
+.company-responsibility-summary {
+  margin: 12px 0 22px;
+}
+.company-responsibility-summary p {
+  display: flex;
+  gap: 15px;
+  justify-content: space-between;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.82rem;
+}
+.company-import-actions {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 18px 0;
+}
+.company-subtext {
+  display: block;
+  color: var(--muted);
+  margin-top: 5px;
+}
+.company-bottom-note {
+  margin-top: 18px;
+}
+@media (max-width: 700px) {
+  .company-sector-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .company-filters > .select-field {
+    max-width: none;
+  }
+  .company-detail-grid {
+    grid-template-columns: 1fr;
+  }
+  .company-selection {
+    padding: 15px;
+  }
+  .company-owners {
+    min-width: 220px;
+  }
+}
+@media (max-width: 1150px) {
+  /* The toolbar turns into a column here; flex-basis would become each filter's height. */
+  .company-filters .search-field,
+  .company-filters > .select-field {
+    flex: 0 0 auto;
+    max-width: none;
+  }
+}
+
+/* Refino visual — 17/10/2026 (Claude Code). Summary as centered mini indicators. */
+.workspace-main .company-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0 0 20px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: white;
+  box-shadow: var(--shadow-soft);
+}
+.workspace-main .company-summary > div:first-child {
+  margin: 0;
+}
+.company-summary-total,
+.company-summary-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 72px;
+  padding: 10px;
+  border-radius: 10px;
+  text-align: center;
+}
+.company-summary-total {
+  background: color-mix(in srgb, #16afc4 8%, white);
+  color: #0e7f87;
+}
+.company-summary-total > svg {
+  display: none;
+}
+.workspace-main .company-summary strong {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.company-summary-total > span,
+.company-summary-status > span {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+.company-summary-status {
+  border: 1px solid transparent;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease;
+}
+.company-summary-status:hover {
+  border-color: color-mix(in srgb, #16afc4 25%, white);
+  background: color-mix(in srgb, #16afc4 6%, white);
+}
+.company-summary-status[aria-pressed="true"] {
+  background: linear-gradient(
+    150deg,
+    #0e7f87,
+    color-mix(in srgb, #0e7f87 82%, #15202b)
+  );
+}
+.company-summary-status[aria-pressed="true"] > strong,
+.company-summary-status[aria-pressed="true"] > span {
+  color: white;
+}
+
+/* Responsibilities: tags for departments with someone in charge, one quiet line for the rest. */
+.company-owners {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  font-size: 0.75rem;
+}
+.company-owner-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px 3px 3px;
+  border-radius: 999px;
+  background: color-mix(in srgb, #16afc4 8%, white);
+  color: var(--ink);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.company-owners .company-owner-tag strong {
+  display: inline-block;
+  min-width: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: white;
+  color: #0e7f87;
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+.company-owner-tag.is-queue {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.company-owner-none {
+  flex-basis: 100%;
+  color: color-mix(in srgb, #15202b 50%, white);
+  font-size: 0.6875rem;
+}
+@media (max-width: 760px) {
+  .workspace-main .company-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .company-summary-status {
+    transition: none;
+  }
+}
+/* Company detail: info in light tiles; departments without obligations stay quiet. */
+.company-detail-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.company-detail-grid > div {
+  padding: 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, #16afc4 6%, white);
+  text-align: center;
+}
+.company-detail-grid dd {
+  font-weight: 600;
+}
+.company-responsibility-summary p.is-empty strong,
+.company-responsibility-summary p.is-empty span {
+  color: color-mix(in srgb, #15202b 45%, white);
+  font-weight: 500;
+}
+@media (max-width: 700px) {
+  .company-detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Lista limpa (17/10/2026): responsibilities as plain lines, no pills. */
+.company-owners {
+  display: grid;
+  gap: 3px;
+  padding: 2px 0;
+}
+.company-owner-tag,
+.company-owner-tag.is-queue {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font-weight: 500;
+  white-space: normal;
+}
+.company-owners .company-owner-tag strong {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.company-owner-tag.is-queue {
+  color: var(--warning);
+}
+.company-owner-none {
+  color: var(--muted);
+}
+.company-tags {
+  gap: 0;
+}
+.company-tags > span {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+.company-tags > span + span::before {
+  content: " · ";
+  white-space: pre;
+}
+
+/* Company situations and sector table (17/10/2026). */
+.company-status-manage {
+  margin: -6px 0 12px;
+  text-align: center;
+}
+.company-selection-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.company-sector-table {
+  display: grid;
+  border: 1px solid var(--line-strong, var(--line));
+  border-radius: 10px;
+  overflow: hidden;
+}
+.company-sector-head,
+.company-sector-line {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) 130px minmax(0, 2fr);
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+}
+.company-sector-head {
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.company-sector-line {
+  border-top: 1px solid var(--line);
+}
+.company-sector-line.is-off strong {
+  color: var(--muted);
+}
+.company-sector-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.company-sector-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: #0e7f87;
+}
+.company-sector-none {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.status-manager-list {
+  display: grid;
+  margin: 0 0 16px;
+  padding: 0;
+  border: 1px solid var(--line-strong, var(--line));
+  border-radius: 10px;
+  list-style: none;
+}
+.status-manager-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+  font-size: 0.85rem;
+}
+.status-manager-list li:first-child {
+  border-top: 0;
+}
+.status-manager-list span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.status-manager-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+@media (max-width: 640px) {
+  .company-sector-head {
+    display: none;
+  }
+  .company-sector-line {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .company-sector-line > div {
+    grid-column: 1 / -1;
+  }
+  .status-manager-add,
+  .status-manager-list li {
+    grid-template-columns: 1fr;
+  }
+}
+form .company-editor-fieldset label.company-sector-toggle {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  margin: 0;
+}
+form .company-editor-fieldset label.company-sector-toggle input {
+  margin: 0;
+}
+
+/* Shortcut to create a department from the company form (17/10/2026). */
+.company-new-department {
+  justify-self: start;
+  margin-top: 10px;
+}
+.company-new-department-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: end;
+  gap: 10px;
+  margin-top: 12px;
+}
+@media (max-width: 640px) {
+  .company-new-department-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Responsibilities column: one clean line per department that serves the company. */
+.company-owners .company-owner-tag,
+.company-owners .company-owner-tag.is-queue {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  line-height: 1.5;
+}
+.company-owners .company-owner-tag strong {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.company-owners .company-owner-tag strong::after {
+  content: " ·";
+}
+
+/* Phones: each company becomes a stacked block (name and situation on top). */
+@media (max-width: 760px) {
+  .company-table,
+  .company-table tbody {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+  .company-table thead {
+    display: none;
+  }
+  .company-table tr {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 6px 12px;
+    align-items: center;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  .company-table td {
+    display: block;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+  }
+  .company-table td:nth-last-child(1) {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .company-table td:nth-last-child(2),
+  .company-table td:nth-last-child(3) {
+    grid-column: 1 / -1;
+  }
+  .company-table td:nth-last-child(3) {
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+}

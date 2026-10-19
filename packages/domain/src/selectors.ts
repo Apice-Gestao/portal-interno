@@ -1,5 +1,6 @@
 import type { Actor, Task } from "./types.js";
 import { hasPermission } from "./access.js";
+import { businessDate } from "./dates.js";
 export const statusLabels = {
   todo: "A fazer",
   in_progress: "Em andamento",
@@ -15,12 +16,16 @@ export const roleLabels = {
   admin: "Administrador",
   supervisor: "Supervisor",
   viewer: "Consulta",
+  manager: "Gerente",
+  director: "Diretoria",
 } as const;
 export function isManager(actor: Actor): boolean {
   return actor.permissions === undefined
     ? actor.role === "admin" ||
         actor.role === "coordinator" ||
-        actor.role === "supervisor"
+        actor.role === "supervisor" ||
+        actor.role === "manager" ||
+        actor.role === "director"
     : hasPermission(actor, "tasks.manage");
 }
 export function canSeeTask(actor: Actor, task: Task): boolean {
@@ -33,7 +38,8 @@ export function canSeeTask(actor: Actor, task: Task): boolean {
     actor.departments.includes(task.department) &&
     (actor.permissions !== undefined
       ? hasPermission(actor, "tasks.team.view") ||
-        task.assigneeId === actor.userId
+        task.assigneeId === actor.userId ||
+        task.assigneeId === `department:${task.department}`
       : actor.role !== "operator" ||
         task.assigneeId === actor.userId ||
         (task.status === "in_review" &&
@@ -56,7 +62,9 @@ export function deadline(
       internalLate: false,
       legalLate: false,
     };
-  const date = task.completedAt?.slice(0, 10) ?? today;
+  const date = task.completedAt
+    ? businessDate(task.completedAt) || businessDate(today)
+    : businessDate(today);
   const internalLate = date > task.internalDue;
   const legalLate = date > task.legalDue;
   return {
@@ -88,16 +96,21 @@ export function deadline(
   };
 }
 export function dateLabel(iso: string): string {
-  const parts = iso.slice(0, 10).split("-");
+  const day = businessDate(iso);
+  if (!day) return "—";
+  const parts = day.split("-");
   return `${parts[2]}/${parts[1]}`;
 }
 export function competenceLabel(value: string): string {
   return `${value.slice(5)}/${value.slice(0, 4)}`;
 }
 export function metric(tasks: Task[], today: string) {
+  const cancelled = tasks.filter((task) => task.cancelled).length;
+  tasks = tasks.filter((task) => !task.cancelled);
   const done = tasks.filter((t) => t.status === "done");
   const dispensed = tasks.filter((t) => t.status === "dispensed");
   return {
+    cancelled,
     total: tasks.length,
     done: done.length,
     dispensed: dispensed.length,

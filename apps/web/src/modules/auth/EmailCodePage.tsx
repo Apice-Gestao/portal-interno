@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { ArrowRight } from "lucide-react";
+import { ForwardIcon } from "../../shared/icons";
 import { Busy, FormError } from "../../shared/ui/components";
 import { AuthLayout } from "./LoginPage";
 
@@ -135,7 +135,7 @@ export default function EmailCodePage({
                   <Busy busy={pending}>
                     {pending ? "Solicitando..." : "Enviar código"}
                   </Busy>
-                  {!pending && <ArrowRight size={18} aria-hidden="true" />}
+                  {!pending && <ForwardIcon size={18} aria-hidden="true" />}
                 </button>
               </fieldset>
             </form>
@@ -171,7 +171,7 @@ export default function EmailCodePage({
                   <Busy busy={pending}>
                     {pending ? "Verificando..." : "Verificar e continuar"}
                   </Busy>
-                  {!pending && <ArrowRight size={18} aria-hidden="true" />}
+                  {!pending && <ForwardIcon size={18} aria-hidden="true" />}
                 </button>
               </fieldset>
             </form>

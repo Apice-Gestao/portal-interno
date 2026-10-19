@@ -1,7 +1,13 @@
 import { createHash } from "node:crypto";
 import type { Pool } from "pg";
 import type { PortalState } from "@apice/domain";
-import { tvDeviceSchema } from "@apice/domain";
+import {
+  tvDeviceSchema,
+  departmentFlowSchema,
+  companyOnboardingSchema,
+  workspaceSettingsSchema,
+  companyChangeProposalSchema,
+} from "@apice/domain";
 import type { TvDevice } from "@apice/domain";
 import { loadState, seedDatabase } from "./postgres-store.js";
 export interface DataBundle {
@@ -37,6 +43,10 @@ export async function exportData(pool: Pool): Promise<DataBundle> {
       templates: [],
       tasks: [],
       audit: [],
+      departmentFlows: [],
+      companyOnboardings: [],
+      workspaces: [],
+      changeProposals: [],
     };
     for (const tenant of tenants.rows) {
       const part = await loadState(client, tenant.id);
@@ -48,6 +58,15 @@ export async function exportData(pool: Pool): Promise<DataBundle> {
         "audit",
       ] as const)
         Object.assign(state, { [key]: [...state[key], ...part[key]] });
+      for (const key of [
+        "departmentFlows",
+        "companyOnboardings",
+        "workspaces",
+        "changeProposals",
+      ] as const)
+        Object.assign(state, {
+          [key]: [...(state[key] ?? []), ...(part[key] ?? [])],
+        });
     }
     const files = await client.query<{
       tenant_id: string;
@@ -118,6 +137,155 @@ export async function importData(pool: Pool, bundle: DataBundle) {
         "Registro pertence a tenant sem usuários no arquivo de migração.",
       );
   const byTenant = new Map<string, Buffer>();
+  for (const key of [
+    "departmentFlows",
+    "companyOnboardings",
+    "workspaces",
+    "changeProposals",
+  ] as const)
+    if (bundle.state[key] !== undefined && !Array.isArray(bundle.state[key]))
+      throw new Error(
+        "Configurações, propostas, fluxos e implantações devem ser listas.",
+      );
+  const workspaceTenants = new Set<string>();
+  for (const workspace of bundle.state.workspaces ?? []) {
+    if (
+      !workspaceSettingsSchema.safeParse(workspace).success ||
+      !tenantIds.includes(workspace.tenantId) ||
+      workspaceTenants.has(workspace.tenantId)
+    )
+      throw new Error("Configuração de grupo inválida no arquivo de migração.");
+    workspaceTenants.add(workspace.tenantId);
+  }
+  const proposalIds = new Set<string>();
+  for (const proposal of bundle.state.changeProposals ?? []) {
+    const key = `${proposal.tenantId}\0${proposal.id}`;
+    if (
+      !companyChangeProposalSchema.safeParse(proposal).success ||
+      proposalIds.has(key) ||
+      !tenantIds.includes(proposal.tenantId) ||
+      !bundle.state.companies.some(
+        (company) =>
+          company.tenantId === proposal.tenantId &&
+          company.id === proposal.companyId,
+      )
+    )
+      throw new Error("Proposta inválida no arquivo de migração.");
+    proposalIds.add(key);
+  }
+  if (
+    (bundle.state.departmentFlows !== undefined &&
+      !Array.isArray(bundle.state.departmentFlows)) ||
+    (bundle.state.companyOnboardings !== undefined &&
+      !Array.isArray(bundle.state.companyOnboardings))
+  )
+    throw new Error("Fluxos e implantações devem ser listas.");
+  const flowIds = new Set<string>();
+  for (const value of bundle.state.departmentFlows ?? []) {
+    const parsed = departmentFlowSchema.safeParse(value);
+    if (!parsed.success || !tenantIds.includes(parsed.data.tenantId))
+      throw new Error(
+        "Fluxo entre departamentos inválido no arquivo de migração.",
+      );
+    const key = `${value.tenantId}\0${value.id}`;
+    if (flowIds.has(key))
+      throw new Error("Fluxo duplicado no arquivo de migração.");
+    flowIds.add(key);
+  }
+  const onboardingIds = new Set<string>();
+  const onboardingCompanies = new Set<string>();
+  for (const value of bundle.state.companyOnboardings ?? []) {
+    const parsed = companyOnboardingSchema.safeParse(value);
+    if (!parsed.success || !tenantIds.includes(parsed.data.tenantId))
+      throw new Error("Implantação inválida no arquivo de migração.");
+    const key = `${value.tenantId}\0${value.id}`;
+    const companyKey = `${value.tenantId}\0${value.companyId}`;
+    const model = bundle.state.departmentFlows?.find(
+      (flow) => flow.tenantId === value.tenantId && flow.id === value.flowId,
+    );
+    if (
+      onboardingIds.has(key) ||
+      (value.kind !== "process" && onboardingCompanies.has(companyKey)) ||
+      !model ||
+      value.flowVersion > model.version ||
+      !bundle.state.companies.some(
+        (company) =>
+          company.tenantId === value.tenantId && company.id === value.companyId,
+      )
+    )
+      throw new Error(
+        "Implantação duplicada ou sem empresa/fluxo correspondente.",
+      );
+    onboardingIds.add(key);
+    if (value.kind !== "process") onboardingCompanies.add(companyKey);
+    const statuses = value.stages.map((stage) => stage.status);
+    const activeIndex = statuses.indexOf("active");
+    if (
+      (value.status === "completed" &&
+        (statuses.some((status) => status !== "done") || !value.completedAt)) ||
+      (value.status === "active" &&
+        (activeIndex < 0 ||
+          statuses.some(
+            (status, index) =>
+              status !==
+              (index < activeIndex
+                ? "done"
+                : index === activeIndex
+                  ? "active"
+                  : "blocked"),
+          ) ||
+          value.completedAt))
+    )
+      throw new Error("Ordem das etapas da implantação é inválida.");
+    for (const stage of value.stages) {
+      if (
+        !bundle.state.users.some(
+          (user) =>
+            user.tenantId === value.tenantId &&
+            user.userId === stage.assigneeId,
+        )
+      )
+        throw new Error("Implantação contém responsável inexistente.");
+      const task = stage.taskId
+        ? bundle.state.tasks.find(
+            (item) =>
+              item.tenantId === value.tenantId && item.id === stage.taskId,
+          )
+        : undefined;
+      if (
+        (stage.status === "blocked" && stage.taskId) ||
+        (stage.status !== "blocked" &&
+          (!task ||
+            task.onboardingId !== value.id ||
+            task.onboardingStageId !== stage.id ||
+            task.companyId !== value.companyId ||
+            task.department !== stage.department ||
+            task.competence !== value.competence ||
+            task.templateId !== "avulsa" ||
+            task.templateVersion !== value.flowVersion ||
+            (stage.status === "done"
+              ? !["done", "dispensed"].includes(task.status)
+              : ["done", "dispensed"].includes(task.status))))
+      )
+        throw new Error(
+          "Etapa da implantação sem tarefa correspondente ou fora de ordem.",
+        );
+    }
+  }
+  for (const task of bundle.state.tasks) {
+    if (!task.onboardingId && !task.onboardingStageId) continue;
+    const onboarding = bundle.state.companyOnboardings?.find(
+      (item) =>
+        item.tenantId === task.tenantId && item.id === task.onboardingId,
+    );
+    if (
+      !onboarding?.stages.some(
+        (stage) =>
+          stage.taskId === task.id && stage.id === task.onboardingStageId,
+      )
+    )
+      throw new Error("Tarefa de implantação sem vínculo válido.");
+  }
   const devices: TvDevice[] = [];
   if (bundle.tvDevices !== undefined) {
     if (!Array.isArray(bundle.tvDevices))

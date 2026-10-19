@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { createSeed, demoPdf, DomainError, PortalEngine } from "@apice/domain";
-import type { Actor } from "@apice/domain";
+import type { Actor, ReportFilters } from "@apice/domain";
 import type { PortalStore, SecurityContext } from "./portal-store.js";
 export class MemoryPortalStore implements PortalStore {
   readonly mode = "memory" as const;
@@ -10,8 +10,14 @@ export class MemoryPortalStore implements PortalStore {
   );
   constructor(readonly engine: PortalEngine) {}
   async ping() {}
+  async tenantIds() {
+    return [process.env.PORTAL_TENANT_ID ?? "apice-demo"];
+  }
   async snapshot(actor: Actor) {
     return this.engine.snapshot(actor);
+  }
+  async report(actor: Actor, filters: ReportFilters) {
+    return this.engine.report(actor, filters);
   }
   async run<T>(
     actor: Actor,

@@ -2,7 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import type { OnModuleDestroy } from "@nestjs/common";
 import { createHash } from "node:crypto";
 import { DomainError, validateEvidence } from "@apice/domain";
-import type { Actor, PortalEngine } from "@apice/domain";
+import type { Actor, PortalEngine, ReportFilters } from "@apice/domain";
 import { PORTAL_STORE } from "../database/portal-store.js";
 import type { PortalStore, SecurityContext } from "../database/portal-store.js";
 export function uploadFilename(original: string): string {
@@ -30,6 +30,9 @@ export class PortalService implements OnModuleDestroy {
   snapshot(actor: Actor) {
     return this.store.snapshot(actor);
   }
+  report(actor: Actor, filters: ReportFilters) {
+    return this.store.report(actor, filters);
+  }
   execute<T>(
     actor: Actor,
     operation: (engine: PortalEngine, resolved: Actor) => T,
@@ -41,6 +44,7 @@ export class PortalService implements OnModuleDestroy {
     id: string,
     revision: number,
     file?: Express.Multer.File,
+    metadata: { logicalId?: string; documentTypeId?: string } = {},
   ) {
     if (!file)
       throw new DomainError("MISSING_FILE", "Selecione uma evidência.");
@@ -50,6 +54,7 @@ export class PortalService implements OnModuleDestroy {
       actor,
       (engine, resolved) =>
         engine.attach(resolved, id, revision, {
+          ...metadata,
           name,
           bytes: file.buffer.length,
           kind,

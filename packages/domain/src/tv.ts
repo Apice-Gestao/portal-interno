@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { generationSchema } from "./schemas.js";
+import { generationSchema, departmentSchema } from "./schemas.js";
+import { businessDate } from "./dates.js";
 import { deadline, metric } from "./selectors.js";
 import type { Department, PortalState, Task } from "./types.js";
 
@@ -54,9 +55,9 @@ export interface UpdateTvDevice {
 
 const deviceName = z.string().trim().min(2).max(60);
 const departments = z
-  .array(z.enum(["Fiscal", "Contábil", "Pessoal"]))
+  .array(departmentSchema)
   .min(1)
-  .max(3)
+  .max(30)
   .refine((values) => new Set(values).size === values.length, {
     message: "Selecione departamentos diferentes.",
   });
@@ -192,10 +193,11 @@ export function createTvFeed(
   device: TvDevice,
   now: string,
 ): TvFeed {
-  const today = now.slice(0, 10);
+  const today = businessDate(now);
   const tasks = state.tasks.filter(
     (task) =>
       task.tenantId === device.tenantId &&
+      !task.cancelled &&
       device.departments.includes(task.department) &&
       task.competence === device.competence,
   );

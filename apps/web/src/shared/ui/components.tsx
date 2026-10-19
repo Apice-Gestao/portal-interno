@@ -1,6 +1,8 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import { X, Inbox, LoaderCircle } from "lucide-react";
+import { CloseIcon, EmptyTrayIcon, LoadingIcon } from "../icons";
 import type { ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
+import { hasPermission } from "@apice/domain";
 import { usePortal } from "../../app/usePortal";
 import { CompetencePicker } from "./CompetencePicker";
 export function Modal({
@@ -22,11 +24,18 @@ export function Modal({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="modal-overlay" />
-        <Dialog.Content className={`modal-content ${wide ? "modal-wide" : ""}`}>
+        <Dialog.Content
+          className={`modal-content ${wide ? "modal-wide" : ""}`}
+          // TEMPORARY demo tour: its balloon sits outside the window.
+          onInteractOutside={(event) => {
+            if ((event.target as HTMLElement | null)?.closest?.(".demo-tour"))
+              event.preventDefault();
+          }}
+        >
           <div className="modal-heading">
             <Dialog.Title>{title}</Dialog.Title>
             <Dialog.Close className="icon-button" aria-label="Fechar janela">
-              <X size={19} />
+              <CloseIcon size={19} />
             </Dialog.Close>
           </div>
           <Dialog.Description
@@ -51,7 +60,7 @@ export function EmptyState({
 }) {
   return (
     <div className="empty-state">
-      <Inbox size={30} />
+      <EmptyTrayIcon size={30} />
       <h3>{title}</h3>
       <p>{text}</p>
       {action}
@@ -77,9 +86,25 @@ export function PageHeading({
     </div>
   );
 }
+// Picking a day opens Tasks filtered by that due date (meta or legal), when the account can see tasks.
 export function CompetenceSelect() {
-  const { competence, setCompetence } = usePortal();
-  return <CompetencePicker value={competence} onValueChange={setCompetence} />;
+  const { actor, competence, setCompetence } = usePortal();
+  const navigate = useNavigate();
+  return (
+    <CompetencePicker
+      value={competence}
+      onValueChange={setCompetence}
+      dayAction={
+        hasPermission(actor, "tasks.view")
+          ? {
+              label: "Ver vencimentos de",
+              onSelect: (day) =>
+                navigate(`/tarefas?dueDate=${day}&dueMode=both`),
+            }
+          : undefined
+      }
+    />
+  );
 }
 export function Busy({
   busy,
@@ -90,7 +115,7 @@ export function Busy({
 }) {
   return (
     <>
-      {busy && <LoaderCircle className="spin" size={16} />} {children}
+      {busy && <LoadingIcon className="spin" size={16} />} {children}
     </>
   );
 }

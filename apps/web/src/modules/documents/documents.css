@@ -1,0 +1,188 @@
+.document-config-intro {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 20px;
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  margin: 0 0 24px;
+  color: var(--teal);
+}
+.document-config-intro svg {
+  flex-shrink: 0;
+}
+.document-config-intro p {
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--muted);
+  margin: 0;
+}
+.document-config-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+.document-config-card {
+  padding: 23px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+.document-config-card p,
+.document-config-card small {
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.document-config-card .text-button {
+  margin-top: auto;
+}
+.document-rules-heading {
+  margin-top: 32px;
+}
+.document-inline-checks,
+.document-check-list {
+  border: 1px solid var(--line);
+  padding: 15px;
+  border-radius: 8px;
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+.document-check-list {
+  display: grid;
+  gap: 12px;
+}
+.document-inline-checks label,
+.document-check-list label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+.document-batch-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+.document-batch-list {
+  display: grid;
+  gap: 16px;
+}
+.document-batch-item {
+  padding: 22px;
+  display: grid;
+  gap: 16px;
+}
+.document-batch-name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.document-batch-name div {
+  flex: 1;
+  min-width: 0;
+}
+.document-batch-name strong {
+  display: block;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+.document-batch-name small {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-top: 5px;
+}
+.document-batch-item.saved {
+  border-color: var(--success);
+}
+.document-batch-item.error {
+  border-color: var(--danger);
+}
+.task-comments {
+  display: grid;
+  gap: 18px;
+}
+.task-comment {
+  padding: 16px;
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.task-comment header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.8rem;
+}
+.task-comment small {
+  color: var(--muted);
+}
+.task-comment p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  margin-top: 10px;
+}
+.task-comment-form {
+  display: grid;
+  gap: 12px;
+}
+.task-attachment-options {
+  display: grid;
+  gap: 12px;
+  margin: 18px 0;
+}
+.task-requirements {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+@media (max-width: 760px) {
+  .document-config-grid {
+    grid-template-columns: 1fr;
+  }
+  .document-batch-item {
+    padding: 16px;
+  }
+}
+
+/* Full filter set — 17/10/2026 (Claude Code). */
+.document-filter-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.document-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px 14px;
+  padding: 16px 20px 18px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, #f2f5f6 60%, white);
+}
+.document-filters > label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+@media (max-width: 760px) {
+  .document-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 14px;
+  }
+}

@@ -3,18 +3,18 @@ import type { FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-  ArrowDown,
-  ArrowUp,
-  Copy,
-  KeyRound,
-  Maximize,
-  Monitor,
-  Pencil,
-  Plus,
-  Power,
-  Play,
-  RefreshCw,
-} from "lucide-react";
+  MoveDownIcon,
+  MoveUpIcon,
+  DuplicateIcon,
+  AccessKeyIcon,
+  ExpandIcon,
+  TvDisplayIcon,
+  EditIcon,
+  AddIcon,
+  PowerIcon,
+  StartIcon,
+  RefreshIcon,
+} from "../../shared/icons";
 import {
   DomainError,
   hasPermission,
@@ -219,7 +219,7 @@ export default function TvPage() {
             navigate(`/painel-tv/exibir${simulation ? "?simulacao=1" : ""}`)
           }
         >
-          <Maximize size={17} />
+          <ExpandIcon size={17} />
           Abrir painel
         </button>
       </PageHeading>
@@ -243,7 +243,7 @@ export default function TvPage() {
                 setParams(next, { replace: true });
               }}
             >
-              <Play size={16} />
+              <StartIcon size={16} />
               {simulation ? "Usar dados reais" : "Simular operação"}
             </button>
           )}
@@ -285,7 +285,7 @@ export default function TvPage() {
               className="button button-secondary"
               onClick={() => void preview.refetch()}
             >
-              <RefreshCw size={16} />
+              <RefreshIcon size={16} />
               Tentar novamente
             </button>
           }
@@ -310,7 +310,7 @@ export default function TvPage() {
                 className="button button-white"
                 onClick={() => openEditor()}
               >
-                <Plus size={16} />
+                <AddIcon size={16} />
                 Novo dispositivo
               </button>
             )}
@@ -338,7 +338,7 @@ export default function TvPage() {
               {devices.data.map((device) => (
                 <article className="tv-device-card" key={device.id}>
                   <div className="tv-device-card-head">
-                    <Monitor size={24} />
+                    <TvDisplayIcon size={24} />
                     <span
                       className={`tv-device-state ${device.active ? "active" : ""}`}
                     >
@@ -362,7 +362,7 @@ export default function TvPage() {
                         disabled={busy}
                         onClick={() => openEditor(device)}
                       >
-                        <Pencil size={13} />
+                        <EditIcon size={13} />
                         Configurar
                       </button>
                     )}
@@ -372,14 +372,14 @@ export default function TvPage() {
                           disabled={busy || !device.active}
                           onClick={() => void generateCode(device)}
                         >
-                          <KeyRound size={13} />
+                          <AccessKeyIcon size={13} />
                           Conectar TV
                         </button>
                         <button
                           disabled={busy}
                           onClick={() => void toggleActive(device)}
                         >
-                          <Power size={13} />
+                          <PowerIcon size={13} />
                           {device.active ? "Desativar" : "Ativar"}
                         </button>
                       </>
@@ -515,7 +515,7 @@ export default function TvPage() {
                             disabled={index <= 0}
                             onClick={() => moveBlock(block, -1)}
                           >
-                            <ArrowUp size={14} />
+                            <MoveUpIcon size={14} />
                           </button>
                           <button
                             type="button"
@@ -525,7 +525,7 @@ export default function TvPage() {
                             }
                             onClick={() => moveBlock(block, 1)}
                           >
-                            <ArrowDown size={14} />
+                            <MoveDownIcon size={14} />
                           </button>
                         </div>
                       );
@@ -657,7 +657,7 @@ export default function TvPage() {
                     .catch(() => setCopied(false));
                 }}
               >
-                <Copy size={15} />
+                <DuplicateIcon size={15} />
                 {copied ? "Copiado" : "Copiar código"}
               </button>
               <button

@@ -90,7 +90,7 @@ function buildSimulation(source: TvFeed, step: number, at: string): TvFeed {
       companyId: companies[(personIndex + variety) % companies.length]!.id,
       templateId: `simulation-template-${person.department}-${slot}`,
       templateVersion: 1,
-      title: obligations[person.department][slot]!,
+      title: (obligations[person.department] ?? obligations.Fiscal!)[slot]!,
       description: "Dado fictício de simulação temporária.",
       department: person.department,
       competence: source.device.competence,

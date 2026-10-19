@@ -621,6 +621,164 @@ try {
     await api("get", "/tv/watch", undefined, undefined, cookie).expect(401);
   });
   await check(
+    "departamento criado conecta cadastro, acessos, tarefas e TV com mais de três setores",
+    async () => {
+      const department = "Societário";
+      const snapshot = (await api("get", "/snapshot", adminToken).expect(200))
+        .body;
+      await api("patch", "/workspace-settings", adminToken, {
+        expectedRevision: snapshot.workspace.revision,
+        departments: [
+          ...snapshot.workspace.departments,
+          { id: department, name: department, active: true },
+        ],
+      }).expect(200);
+      const allDepartments = ["Fiscal", "Contábil", "Pessoal", department];
+      await api("patch", "/users/helena", adminToken, {
+        departments: allDepartments,
+      }).expect(200);
+      await api("patch", "/users/julia", adminToken, {
+        departments: ["Fiscal", department],
+      }).expect(200);
+      const colleague = (
+        await api("post", "/users", adminToken, {
+          name: "Colaborador Societário Teste",
+          username: "tv-societario",
+          email: "tv-societario@example.invalid",
+          password: "SyntheticTvDepartmentOnly123!",
+          departments: [department],
+          permissions: ["tasks.view", "tasks.execute"],
+          role: "operator",
+        }).expect(201)
+      ).body;
+      const task = (
+        await api("post", "/tasks", adminToken, {
+          title: "Parametrização societária sintética",
+          description: "Conexão de setor personalizado com a TV em base temporária.",
+          companyId: state.companies.find(
+            (row) => row.tenantId === "apice-demo",
+          ).id,
+          department,
+          internalDue: "2026-09-15",
+          legalDue: "2026-09-20",
+          assigneeId: colleague.userId,
+          requiresReview: false,
+        }).expect(201)
+      ).body;
+      assert.equal(task.department, department);
+      const endpoint = `/tv/preview?competence=${task.competence}&department=${encodeURIComponent(department)}`;
+      for (const token of [adminToken, managerToken]) {
+        const feed = (await api("get", endpoint, token).expect(200)).body;
+        assert.deepEqual(feed.device.departments, [department]);
+        assert.equal(feed.total, 1);
+        assert.ok(
+          feed.collaborators.some((row) => row.name === colleague.name),
+        );
+        assert.ok(!JSON.stringify(feed).includes("Outro tenant"));
+        assert.ok(!JSON.stringify(feed).includes('"permissions"'));
+      }
+      await api("get", endpoint, configToken).expect(403);
+      await api("get", endpoint, readerToken).expect(403);
+      await api("get", `${endpoint}&tenantId=tv-foreign`, adminToken).expect(
+        400,
+      );
+      const dynamicDevice = (
+        await api("post", "/tv-devices", managerToken, {
+          name: "TV Societário de teste",
+          departments: [department],
+          competence: task.competence,
+        }).expect(201)
+      ).body;
+      await api("patch", `/tv-devices/${dynamicDevice.id}`, managerToken, {
+        expectedVersion: dynamicDevice.version,
+        departments: allDepartments,
+      }).expect(403);
+      const expanded = (
+        await api("patch", `/tv-devices/${dynamicDevice.id}`, adminToken, {
+          expectedVersion: dynamicDevice.version,
+          departments: allDepartments,
+        }).expect(200)
+      ).body;
+      assert.deepEqual(expanded.departments, allDepartments);
+      const pairing = (
+        await api(
+          "post",
+          `/tv-devices/${expanded.id}/pair-code`,
+          adminToken,
+        ).expect(201)
+      ).body;
+      const dynamicCookie = await pair(pairing.code);
+      const watched = (
+        await api(
+          "get",
+          "/tv/watch",
+          undefined,
+          undefined,
+          dynamicCookie,
+        ).expect(200)
+      ).body;
+      assert.deepEqual(watched.device.departments, allDepartments);
+      assert.ok(
+        watched.collaborators.some((row) => row.name === colleague.name),
+      );
+      const runtimePool = new pg.Pool({
+        connectionString: dbUrl(runtime, database),
+        max: 1,
+      });
+      const client = await runtimePool.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query(
+          "SELECT set_config('portal.tenant_id','tv-foreign',true)",
+        );
+        assert.equal(
+          (
+            await client.query("SELECT id FROM portal.tv_devices WHERE id=$1", [
+              expanded.id,
+            ])
+          ).rowCount,
+          0,
+        );
+        await client.query("ROLLBACK");
+      } finally {
+        client.release();
+        await runtimePool.end();
+      }
+      for (const invalid of [
+        [],
+        [department, department],
+        [""],
+        ["X".repeat(81)],
+        ["Societário\n"],
+        [123],
+        Array.from({ length: 31 }, (_, index) => `Setor ${index}`),
+      ])
+        await assert.rejects(
+          ownerPool.query(
+            "UPDATE portal.tv_devices SET payload=jsonb_set(payload,'{departments}',$2::jsonb) WHERE id=$1",
+            [expanded.id, JSON.stringify(invalid)],
+          ),
+          (error) => error.code === "23514",
+        );
+      await api("patch", "/users/julia", adminToken, {
+        departments: ["Fiscal"],
+      }).expect(200);
+      await api("get", endpoint, managerToken).expect(403);
+      const restrictedList = (
+        await api("get", "/tv-devices", managerToken).expect(200)
+      ).body;
+      assert.ok(!restrictedList.some((row) => row.id === expanded.id));
+      await api(
+        "post",
+        "/tv/disconnect",
+        undefined,
+        undefined,
+        dynamicCookie,
+      ).expect(201);
+      await migrateDatabase(ownerPool, runtime.username);
+    },
+  );
+  await check(
     "limite de tentativas inclui códigos malformados antes de validar o corpo",
     async () => {
       const rateApp = await createApplication();

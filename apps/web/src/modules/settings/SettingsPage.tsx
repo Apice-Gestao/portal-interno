@@ -1,27 +1,31 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
-  ShieldCheck,
-  Users,
-  History,
-  HardDrive,
-  Search,
-  LockKeyhole,
-  CircleCheck,
-  Server,
-  KeyRound,
-} from "lucide-react";
-import { dateLabel, roleLabels } from "@apice/domain";
+  SecurityIcon,
+  TeamIcon,
+  AuditHistoryIcon,
+  StorageIcon,
+  SearchIcon,
+  AccessLockIcon,
+  CompletedIcon,
+  ServerIcon,
+  AccessKeyIcon,
+} from "../../shared/icons";
+import { businessTime, dateLabel, roleLabels } from "@apice/domain";
 import { usePortal } from "../../app/usePortal";
 import { isHostedDemo } from "../../services/portal-client";
 import { EmptyState, PageHeading } from "../../shared/ui/components";
+import { DepartmentSettings } from "./DepartmentSettings";
 const tabs = [
-  { id: "team", label: "Equipe e acesso", icon: Users },
-  { id: "audit", label: "Auditoria", icon: History },
-  { id: "storage", label: "Ambiente e armazenamento", icon: HardDrive },
+  { id: "departments", label: "Departamentos", icon: TeamIcon },
+  { id: "team", label: "Equipe e acesso", icon: TeamIcon },
+  { id: "audit", label: "Auditoria", icon: AuditHistoryIcon },
+  { id: "storage", label: "Ambiente e armazenamento", icon: StorageIcon },
 ];
 export default function SettingsPage() {
   const { data, actor } = usePortal();
-  const [tab, setTab] = useState("team");
+  const [params] = useSearchParams();
+  const [tab, setTab] = useState(params.get("aba") ?? "departments");
   const [search, setSearch] = useState("");
   const [eventPage, setEventPage] = useState(1);
   const events = data.audit.filter((e) =>
@@ -49,6 +53,7 @@ export default function SettingsPage() {
           </button>
         ))}
       </div>
+      {tab === "departments" && <DepartmentSettings />}
       {tab === "team" && (
         <>
           <section className="surface">
@@ -68,7 +73,7 @@ export default function SettingsPage() {
                     <th>PESSOA</th>
                     <th>PERFIL</th>
                     <th>DEPARTAMENTOS</th>
-                    <th>ACESSO</th>
+                    <th>PERMISSÕES ATRIBUÍDAS</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -89,9 +94,9 @@ export default function SettingsPage() {
                       <td>{user.departments.join(", ")}</td>
                       <td>
                         <span className="badge status-done">
-                          {user.role === "viewer"
-                            ? "Somente leitura"
-                            : "Operacional"}
+                          {user.permissions === undefined
+                            ? "Demonstração"
+                            : `${user.permissions.length} ${user.permissions.length === 1 ? "permissão" : "permissões"}`}
                         </span>
                       </td>
                     </tr>
@@ -102,7 +107,7 @@ export default function SettingsPage() {
           </section>
           <div className="settings-info-grid">
             <div className="surface settings-info">
-              <ShieldCheck size={23} />
+              <SecurityIcon size={23} />
               <h3>Permissões por perfil e escopo</h3>
               <p>
                 O administrador define abas, ações e departamentos por pessoa. O
@@ -110,7 +115,7 @@ export default function SettingsPage() {
               </p>
             </div>
             <div className="surface settings-info">
-              <KeyRound size={23} />
+              <AccessKeyIcon size={23} />
               <h3>Login individual</h3>
               <p>
                 Contas e permissões ficam no banco. Senhas são armazenadas como
@@ -125,7 +130,7 @@ export default function SettingsPage() {
         <section className="surface">
           <div className="table-toolbar">
             <label className="search-field">
-              <Search size={17} />
+              <SearchIcon size={17} />
               <input
                 placeholder="Buscar evento ou pessoa..."
                 aria-label="Buscar auditoria"
@@ -137,7 +142,7 @@ export default function SettingsPage() {
               />
             </label>
             <span className="badge status-todo">
-              <LockKeyhole size={13} />
+              <AccessLockIcon size={13} />
               Somente leitura
             </span>
           </div>
@@ -163,7 +168,7 @@ export default function SettingsPage() {
                         <td>{event.detail}</td>
                         <td>{event.actorName}</td>
                         <td>
-                          {dateLabel(event.at)} · {event.at.slice(11, 16)}
+                          {dateLabel(event.at)} · {businessTime(event.at)}
                         </td>
                       </tr>
                     ))}
@@ -215,13 +220,13 @@ export default function SettingsPage() {
                   : "Dados temporários, estrutura preparada"}
               </h2>
             </div>
-            <Server size={23} />
+            <ServerIcon size={23} />
           </div>
           <div className="environment-rows">
             <div>
               <span>Interface</span>
               <strong>React + Vite + TypeScript</strong>
-              <CircleCheck size={17} />
+              <CompletedIcon size={17} />
             </div>
             <div>
               <span>API em execução</span>
@@ -230,7 +235,7 @@ export default function SettingsPage() {
                   ? "Demonstração no navegador"
                   : "NestJS · ambiente local"}
               </strong>
-              <CircleCheck size={17} />
+              <CompletedIcon size={17} />
             </div>
             <div>
               <span>Persistência</span>
@@ -267,7 +272,7 @@ export default function SettingsPage() {
             </div>
           </div>
           <div className="info-box">
-            <ShieldCheck size={20} />
+            <SecurityIcon size={20} />
             <p>
               Use apenas dados fictícios.{" "}
               {data.persistence === "postgres"

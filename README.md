@@ -30,25 +30,22 @@ Cargo é identificação, não um teto de acesso. O administrador pode conceder 
 
 ## O que está disponível
 
-| Módulo              | Comportamento atual                                                                                                                                                                                                                   |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Visão geral         | Indicadores por departamento e competência, com acesso às tarefas correspondentes.                                                                                                                                                    |
-| Tarefas             | Busca, filtros, paginação, tarefas avulsas, execução por etapas e evidências PDF/XML. Conferência por outra pessoa, espera pelo cliente, devolução, solicitação/aprovação de dispensa, redistribuição e reabertura com justificativa. |
-| Empresas e carteira | Consulta, cadastro e importação CSV com prévia; preservação de CNPJs já cadastrados.                                                                                                                                                  |
-| Modelos             | Criação e edição de rotinas mensais e suas etapas, cópia de fluxos, salvamento versionado e geração manual idempotente por competência. |
-| Documentos          | Consulta e download das versões das evidências dentro do escopo autorizado.                                                                                                                                                           |
-| Relatórios          | Pendências, entregas, matriz de obrigações, volume por colaborador e dispensas/reaberturas; CSV e impressão pelo navegador.                                                                                                           |
-| Configurações       | Consulta da estrutura, histórico e informações do ambiente, conforme a permissão de acesso. |
-| Usuários e permissões | Contas individuais, cargos informativos, departamentos, abas/ações por pessoa, ativação/desativação e reset de senha temporária. |
-| Painel de TV | Prévia dedicada, progresso, prazos, entregas e rodízio; dispositivos com configuração, vinculação por código e revogação. |
+- Entrada pelo ecossistema, login individual e controle de abas/ações, sem teto por cargo. Os três grupos usam ambientes fictícios separados na demonstração local; autenticação normal de Go/Condomínios ainda exige implantação própria.
+- Menu azul Ápice recolhível, logo oficial branca e itens reordenáveis por arraste ou Alt+setas no controle. A ordem é uma preferência por usuário/navegador.
+- Departamentos configuráveis: cargos com nome livre, pessoas, liderança por setor e ordem de apresentação. Um vínculo organizacional não altera permissões automaticamente. Configurações → Departamentos gerencia essa estrutura; Usuários e permissões gerencia acessos, cópia/modelos e importação de contas.
+- Visão geral com indicadores clicáveis, calendário de meta/prazo legal e visão operacional conforme acesso; tarefas em lista/quadro, execução, espera, conferência independente, cancelamento, dispensa, reabertura e comentários com histórico.
+- Empresas com código informado, filtros/agrupadores, carteira por colaborador, responsabilidades individuais/fila/sem obrigações por setor, situação de atendimento e competência de efeito. Mudanças operacionais seguem para a Central do gestor, com impacto, decisão e preservação do histórico.
+- Modelos de tarefas com etapas editáveis e versões. Novas tarefas recebem cópia; tarefas existentes preservam andamento, documentos e requisitos. Geração repetida não duplica obrigações.
+- Fluxos e Processos: modelos sequenciais entre departamentos, etapas, prazos, responsáveis e kanban. Implantação inicial única por empresa e processos gerais reutilizáveis. O gestor decide se a rotina aguarda todos os setores ou começa em paralelo.
+- Múltiplos anexos por tarefa, versões por documento, tipos e regras documentais editáveis. Envio em lote sugere vínculos e exige revisão humana antes de gravar. Verificação de formato não representa validação fiscal oficial.
+- Importação/exportação de empresas, modelos, atividades e relatórios; importação de usuários baseada em modelos de acesso; transferências de tarefas e propostas de carteira em lote com validação atômica. A exportação normal de usuários não contém senhas. O resultado da importação permite baixar senhas temporárias individuais uma única vez na janela, exigindo troca no primeiro acesso.
+- Catálogo de 31 relatórios com seis principais, filtros por datas/empresa/pessoa/escopo, CSV e impressão completa. Desempenho individual exige permissão própria. Painel de TV com consulta, dispositivos, departamentos configuráveis e simulação temporária identificada.
 
-A interface usa a paleta definida: `#16AFC4`, `#0E7F87`, `#15202B`, `#F2F5F6` e branco, com transparências e misturas desses tons. A identificação é textual; não foi criada logomarca.
+### Fluxos, tarefas e alterações
 
-### Editar um fluxo
+Em **Modelos de tarefa**, abra um modelo para editar etapas ou copiar um fluxo. Em **Fluxos e Processos → Modelos e blocos**, crie a sequência dos setores; o exemplo de implantação apenas preenche um rascunho que o gestor revisa antes de salvar. Concluir/conferir a tarefa atual libera a próxima etapa, respeitando documentos e permissões.
 
-Em **Modelos de tarefa**, abra o modelo e escolha **Editar modelo e fluxo**. Usuários com `templates.manage` podem incluir, renomear, remover e ordenar etapas, começar pelo fluxo padrão ou copiar as etapas de outro modelo do mesmo departamento. Evidência e conferência continuam configuradas no modelo. O fluxo salvo é uma sequência de etapas de execução; ramificações e processos entre departamentos ainda estão pendentes.
-
-Ao salvar, o modelo recebe uma nova versão auditada. Novas tarefas geradas recebem uma cópia dessas etapas e exigências. Tarefas já geradas mantêm sua versão, seus documentos e seu andamento; gerar novamente a mesma competência não as substitui. Se outra pessoa editar o modelo enquanto o formulário está aberto, o servidor recusa a versão desatualizada para evitar sobrescrever a alteração.
+Ao editar regime, responsáveis ou situação da empresa, informe competência e motivo e envie para a **Central do gestor**. A aprovação revalida a versão, registra histórico, gera obrigações aplicáveis e sinaliza tarefas incompatíveis para revisão. O gestor deve confirmar se a tarefa permanece necessária ou cancelá-la com justificativa. Entregas anteriores e documentos são preservados. O catálogo fiscal oficial ainda precisa ser validado e configurado; regime sozinho não determina todas as obrigações.
 
 ## Estrutura e persistência
 
@@ -66,16 +63,21 @@ Na execução local PostgreSQL, tarefas, cadastros, contas, permissões, auditor
 
 ## Verificações
 
+Revisão integrada mais recente: [auditoria de 17/10/2026](docs/AUDITORIA-INTEGRADA-2026-10-17.md), com correções nas conexões, verificações realizadas e requisitos ainda parciais. O protótipo não representa PRD integral nem prontidão para VPS.
+
 ```powershell
 npm run check
 npm run test:database
 npm run test:workflows
+npm run test:onboarding
+npm run test:tv
+npm run test:massive
 npx playwright install chromium
 npm run test:e2e
 npm audit
 ```
 
-`check` executa tipagem, lint, testes de domínio/API e build. Os testes de navegador usam login e contas reais em um banco local temporário, com portas próprias, sem alterar a conta inicial ou a base principal. `test:database` usa outras bases temporárias para regras, SQL, carga e recuperação. `test:massive` reúne essas verificações. A instalação do Chromium é necessária somente na primeira execução. Os testes anteriores do seletor de demonstração ficaram como referência histórica; não validam o fluxo atual. Os controles e limites estão descritos em [segurança](docs/SEGURANCA.md).
+`check` executa tipagem, lint, testes de domínio/API e build. `test:massive` executa check, carga/recuperação/identidade PostgreSQL, fluxos, jornadas entre módulos e TV em bases temporárias, conferindo preservação da principal e limpeza. Logs privados em `.local/verification/`. Detalhes em [testes massivos](docs/TESTES-MASSIVOS-2026-10-17.md). Testes de navegador são separados: usam banco temporário/portas próprias e dependem do controle de navegador disponível. A instalação do Chromium é necessária somente na primeira execução. Os testes antigos do seletor demo são referência histórica; controles e limites em [segurança](docs/SEGURANCA.md).
 
 `test:workflows` verifica edição, concorrência, autorização, isolamento e geração de fluxos em uma base PostgreSQL temporária. Usa sessões sintéticas isoladas para exercitar a API; não comprova login por senha, recuperação ou MFA. A base temporária é removida ao terminar.
 
@@ -95,4 +97,4 @@ Leia [o contexto permanente](docs/CONTEXTO.md) antes de continuar. `AGENTS.md` i
 
 ## Limites desta entrega
 
-Esta versão cobre a base do ciclo mensal e não todos os requisitos do PRD. Permanecem pendentes: MFA/recuperação de conta e política corporativa, configuração da VPS, retenção e recuperação, calendário oficial e feriados, geração agendada e outras periodicidades, cliente com múltiplas empresas, processos entre departamentos, histórico de regimes e carteira por departamento, edição/versionamento completo dos modelos, integrações e publicação para o Portal do Cliente, perfis por departamento/carteira. O P.O.P. exibido é demonstrativo; não há gestão de procedimentos. O relatório de produtividade mede volume e prazo, sem contabilizar tempo ativo. Consulte [a auditoria do PRD](docs/AUDITORIA-PRD-2026-10-08.md) e [a revisão após as correções](docs/REVISAO-E-VALIDACAO-2026-10-08.md).
+Esta versão ainda não cobre todos os requisitos do PRD. Permanecem pendentes a configuração/validação corporativa de SMTP, recuperação e MFA, implantação da VPS, operação de retenção/recuperação, calendário oficial e feriados, catálogo fiscal validado, geração agendada e outras periodicidades, autenticação normal e regras específicas dos demais grupos, cliente com múltiplas empresas, editor de ramificações, aprovação universal de mudanças, integrações e publicação para o Portal do Cliente. O P.O.P. exibido é demonstrativo; não há gestão de procedimentos. O relatório de produtividade mede volume e prazo, sem contabilizar tempo ativo. Consulte [a auditoria do PRD](docs/AUDITORIA-PRD-2026-10-08.md) e [a revisão após as correções](docs/REVISAO-E-VALIDACAO-2026-10-08.md).

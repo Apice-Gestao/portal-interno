@@ -1,4 +1,5 @@
 @import url("./shared/ui/ui.css");
+@import url("./shared/icons/icons.css");
 :root {
   font-family: Inter, system-ui, sans-serif;
   color: #15202b;
@@ -23,12 +24,19 @@
 }
 * {
   box-sizing: border-box;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 body {
   margin: 0;
 }
 html {
-  scrollbar-gutter: stable;
+  scrollbar-gutter: auto;
 }
 button,
 input,
@@ -1101,5 +1109,373 @@ input::placeholder {
   }
   .search-field {
     min-width: 0;
+  }
+}
+
+/* ===== Refino visual global — 17/10/2026 (Claude Code) =====
+   Visual-only layer over shared classes: typography, surfaces, numbers,
+   tables, controls. No component, rule or data changes. The competence
+   calendar keeps its own styles. */
+:root {
+  --radius: 14px;
+  --line: color-mix(in srgb, #15202b 9%, white);
+  --shadow-soft:
+    0 1px 2px rgb(21 32 43 / 0.04), 0 10px 28px -14px rgb(21 32 43 / 0.1);
+  --shadow-raised:
+    0 2px 4px rgb(21 32 43 / 0.05), 0 18px 36px -16px rgb(14 127 135 / 0.28);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, #16afc4 35%, transparent);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Page titles and introductions */
+.page-heading h1 {
+  font-size: clamp(1.625rem, 2.2vw, 2rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+.page-heading p {
+  max-width: 68ch;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+h2 {
+  letter-spacing: -0.02em;
+}
+.eyebrow,
+.surface-heading .eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--teal);
+}
+.surface-heading h2 {
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+
+/* Surfaces and cards share one radius, border and depth */
+.surface,
+.metric-card,
+.model-card,
+.report-catalog {
+  border-color: var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-soft);
+}
+.metric-card {
+  transition:
+    transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.25s ease;
+}
+.metric-card:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, #16afc4 45%, white);
+  box-shadow: var(--shadow-raised);
+}
+.surface-heading {
+  padding: 20px 24px;
+}
+
+/* Numbers: equal-width digits and confident weight */
+.metric-card .metric-main > strong,
+.summary-stat strong,
+.summary-progress strong,
+.report-summary strong,
+.calendar-tile strong,
+.nav-count,
+.data-table td,
+.table-footer,
+.badge,
+.pagination > span {
+  font-variant-numeric: tabular-nums;
+}
+.metric-card .metric-main > strong {
+  font-size: clamp(2rem, 2.6vw, 2.5rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--ink);
+}
+.metric-card p {
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+/* Tables */
+.data-table th {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, #15202b 58%, white);
+  background: color-mix(in srgb, #f2f5f6 70%, white);
+  padding: 12px 20px;
+}
+.data-table td {
+  padding: 15px 20px;
+  border-bottom-color: color-mix(in srgb, #15202b 6%, white);
+}
+.data-table tbody tr:hover {
+  background: color-mix(in srgb, #16afc4 5%, white);
+}
+.table-footer {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+/* Badges become soft pills */
+.badge,
+.workspace-main .badge {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* Buttons and fields */
+.button {
+  border-radius: 10px;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.12s ease;
+}
+.button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.button:focus-visible,
+.filter-button:focus-visible,
+.search-field:focus-within {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.button-primary {
+  box-shadow: 0 6px 14px -8px rgb(14 127 135 / 0.7);
+}
+.button-white {
+  border-color: var(--line);
+  color: var(--ink);
+}
+.button-white:hover {
+  border-color: color-mix(in srgb, #16afc4 40%, white);
+  background: color-mix(in srgb, #16afc4 5%, white);
+}
+.search-field,
+.filter-button {
+  border-radius: 10px;
+}
+.search-field {
+  border-color: var(--line);
+  background: color-mix(in srgb, #f2f5f6 60%, white);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.search-field:focus-within {
+  border-color: #16afc4;
+  background: white;
+}
+.search-field input {
+  color: var(--ink);
+}
+.search-field input::placeholder {
+  color: color-mix(in srgb, #15202b 45%, white);
+}
+
+/* Section tab bars are centered, following the user's centering preference. */
+.workspace-main .section-tabs {
+  justify-content: center;
+}
+
+/* Small counters share one pill style (tabs, kanban columns, report categories). */
+.workspace-main .account-tabs button span,
+.workspace-main .process-column > header span,
+.workspace-main .report-category-toggle > small {
+  min-width: 24px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, #16afc4 12%, white);
+  color: #0e7f87;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1.5;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.workspace-main .account-tabs button.active span {
+  background: #0e7f87;
+  color: white;
+}
+
+/* Smallest labels stay readable (were 9px) */
+.calendar-tile small,
+.footnote-brand,
+.report-category > .eyebrow {
+  font-size: 0.625rem;
+}
+.brand-sub {
+  font-size: 0.625rem;
+}
+.avatar-tiny {
+  font-size: 0.625rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .metric-card,
+  .button {
+    transition: none;
+  }
+  .metric-card:hover,
+  .button:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* Phones: the blue sidebar is hidden, so the brand color moves to the top bar
+   and a soft blue wash at the top of each page (17/10/2026). */
+@media (max-width: 760px) {
+  .workspace-main {
+    background: linear-gradient(
+        180deg,
+        color-mix(in srgb, #16afc4 22%, #f2f5f6) 0,
+        #f2f5f6 280px
+      )
+      no-repeat;
+    min-height: 100dvh;
+  }
+  .workspace-main > .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: linear-gradient(
+      180deg,
+      #16afc4,
+      color-mix(in srgb, #16afc4 90%, #0e7f87)
+    );
+    border-bottom: 0;
+    box-shadow: 0 6px 16px -10px rgb(14 127 135 / 0.7);
+  }
+  .workspace-main > .topbar .icon-button {
+    color: #15202b;
+  }
+  .workspace-main > .topbar .icon-button:hover {
+    background: rgb(255 255 255 / 0.22);
+  }
+  .workspace-main > .topbar .department-selector {
+    border-right: 0;
+    padding: 2px 4px 2px 10px;
+    border-radius: 10px;
+    background: rgb(255 255 255 / 0.9);
+    color: #15202b;
+  }
+  .workspace-main > .topbar .avatar {
+    background: white;
+    color: #0e7f87;
+  }
+  .workspace-main > .topbar .breadcrumb {
+    color: #15202b;
+  }
+}
+
+/* Revisão do celular — 17/10/2026 (Claude Code).
+   Phones get touch-first layouts: no clipped actions, swipeable strips, clear hierarchy. */
+@media (max-width: 760px) {
+  /* Page actions: a tidy grid instead of a row that clips the main button. */
+  .page-heading .heading-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+    overflow: visible;
+  }
+  .page-heading .heading-actions > * {
+    width: 100%;
+    min-width: 0;
+  }
+  .page-heading .heading-actions > .button {
+    min-height: 44px;
+    white-space: normal;
+    line-height: 1.2;
+    text-align: center;
+  }
+  .page-heading .heading-actions > .button-primary,
+  .page-heading .heading-actions > .competence-trigger {
+    grid-column: 1 / -1;
+  }
+  .page-heading .heading-actions > .button-primary {
+    order: -1;
+  }
+  .page-heading .heading-actions > .competence-trigger {
+    order: -2;
+  }
+  .page-heading
+    .heading-actions
+    > :last-child:nth-child(odd):not(.button-primary):not(.competence-trigger) {
+    grid-column: 1 / -1;
+  }
+
+  /* The page name already heads the content; on the blue bar it was faint and repeated. */
+  .workspace-main > .topbar .breadcrumb > strong {
+    display: none;
+  }
+
+  /* Tab strips scroll sideways on one line, with snap. */
+  .workspace-main .settings-tabs,
+  .workspace-main .account-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    margin-inline: -16px;
+    padding-inline: 16px;
+  }
+  .workspace-main .settings-tabs > button,
+  .workspace-main .account-tabs > button {
+    flex: none;
+    white-space: nowrap;
+    scroll-snap-align: start;
+  }
+
+  /* Kanban: one column per screen with a peek of the next, swipe to move. */
+  .workspace-main .process-board {
+    grid-template-columns: repeat(4, 84%);
+    scroll-snap-type: x mandatory;
+    margin-inline: -16px;
+    padding-inline: 16px;
+    scroll-padding-inline: 16px;
+  }
+  .process-board > * {
+    scroll-snap-align: start;
+  }
+  .process-column {
+    min-height: 260px;
+  }
+
+  /* Modal forms: flexible columns (two fixed 160px columns overflowed) and full-width actions. */
+  .modal-content .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .modal-content .form-grid input,
+  .modal-content .form-grid .select-field,
+  .modal-content .form-grid .select-field-trigger {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .modal-content .form-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .modal-content .form-actions > .button {
+    width: 100%;
+    min-height: 44px;
   }
 }

@@ -30,6 +30,7 @@ import {
 } from "./email-mfa.service.js";
 import {
   accountInputSchema,
+  accountImportSchema,
   accountUpdateSchema,
   loginSchema,
   passwordSchema,
@@ -68,10 +69,15 @@ export class SessionController {
     body: {
       username: string;
       password: string;
+      groupId?: "contabil" | "go" | "condominios";
     },
     @Req() req: AuthRequest,
   ) {
-    const result = await this.sessions.login(body.username, body.password);
+    const result = await this.sessions.login(
+      body.username,
+      body.password,
+      body.groupId,
+    );
     if ("token" in result) {
       try {
         await this.portal.security(
@@ -169,6 +175,15 @@ export class SessionController {
     @Req() req: AuthRequest,
   ) {
     return this.identities.create(req.actor, body);
+  }
+  @RequirePermission("users.manage")
+  @Post("users/import")
+  @ApiBody({ schema: swaggerSchema(accountImportSchema) })
+  async importUsers(
+    @Body(new SchemaPipe(accountImportSchema)) body: { users: AccountInput[] },
+    @Req() req: AuthRequest,
+  ) {
+    return this.identities.createMany(req.actor, body.users);
   }
   @RequirePermission("users.manage")
   @Patch("users/:id")

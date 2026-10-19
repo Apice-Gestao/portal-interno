@@ -17,6 +17,7 @@ import type { Request, Response } from "express";
 import { z } from "zod";
 import {
   createTvDeviceSchema,
+  departmentSchema,
   pairTvSchema,
   updateTvDeviceSchema,
 } from "@apice/domain";
@@ -31,7 +32,7 @@ import { TvPairGuard } from "./tv-pair.guard.js";
 const previewSchema = z
   .object({
     competence: z.string().regex(/^(?!0000)\d{4}-(0[1-9]|1[0-2])$/),
-    department: z.enum(["Fiscal", "Contábil", "Pessoal"]).optional(),
+    department: departmentSchema.optional(),
   })
   .strict();
 const COOKIE = "portal_tv";

@@ -1,0 +1,167 @@
+/* TEMPORARY (17/10/2026): client demo tour. See docs/TUTORIAL-DEMO-TEMPORARIO.md. */
+.demo-tour {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+}
+/* The highlighted part stays clear; everything else is dimmed. */
+.demo-tour-spot {
+  position: fixed;
+  border: 2px solid #16afc4;
+  border-radius: 12px;
+  box-shadow: 0 0 0 9999px rgb(21 32 43 / 0.55);
+  pointer-events: none;
+  animation: demo-tour-in 0.2s ease;
+}
+.demo-tour-balloon {
+  position: fixed;
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px 14px;
+  border: 1px solid #0e7f87;
+  border-radius: 12px;
+  background: white;
+  color: #15202b;
+  box-shadow: 0 18px 40px -18px rgb(21 32 43 / 0.6);
+  outline: none;
+}
+.demo-tour-balloon:focus-visible {
+  outline: 2px solid #16afc4;
+  outline-offset: 2px;
+}
+.demo-tour-arrow {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  border: 1px solid #0e7f87;
+  background: white;
+  transform: rotate(45deg);
+}
+.is-below .demo-tour-arrow {
+  top: -8px;
+  border-right: 0;
+  border-bottom: 0;
+}
+.is-above .demo-tour-arrow {
+  bottom: -8px;
+  border-top: 0;
+  border-left: 0;
+}
+.demo-tour-count {
+  margin: 0;
+  color: #0e7f87;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.demo-tour-balloon h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+.demo-tour-balloon p {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+.demo-tour-balloon footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+.demo-tour-balloon footer > span {
+  display: flex;
+  gap: 8px;
+}
+.demo-tour-balloon button {
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.demo-tour-skip {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #4c5e68;
+  text-decoration: underline;
+}
+.demo-tour-back {
+  border: 1px solid #0e7f87;
+  background: white;
+  color: #0e7f87;
+}
+.demo-tour-next {
+  border: 1px solid #0e7f87;
+  background: #0e7f87;
+  color: white;
+}
+@media (prefers-reduced-motion: reduce) {
+  .demo-tour-spot {
+    transition: none;
+  }
+}
+
+/* Centered explanation (no element highlighted). */
+.demo-tour-dim {
+  position: fixed;
+  inset: 0;
+  background: rgb(21 32 43 / 0.55);
+}
+.demo-tour-balloon.is-centered {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+@keyframes demo-tour-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .demo-tour-spot {
+    animation: none;
+  }
+}
+
+/* Modal drawers disable pointer events on the page; the tour stays usable. */
+.demo-tour,
+.demo-tour * {
+  pointer-events: auto;
+}
+.demo-tour .demo-tour-spot {
+  pointer-events: none;
+}
+
+.demo-tour-links {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+}
+.demo-tour-links .demo-tour-skip {
+  min-height: 0;
+  font-size: 0.78rem;
+}
+.demo-tour-balloon footer.demo-tour-final {
+  justify-content: center;
+}
+
+/* TEMPORARY: notice for downloads/printing blocked by the published preview frame. */
+.preview-blocked {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  text-align: center;
+}
+.preview-blocked p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}

@@ -14,8 +14,9 @@ import { EmailMfaService } from "./email-mfa.service.js";
 import {
   localTestIdentity,
   localTestLoginEnabled,
-  LOCAL_TEST_TENANT,
+  LOCAL_TEST_GROUPS,
 } from "./local-test-login.js";
+import type { PortalGroup } from "./local-test-login.js";
 
 interface StoredSession {
   actor: Actor;
@@ -59,13 +60,14 @@ export class SessionService {
       throw new UnauthorizedException("Perfil de demonstração inválido.");
     return this.issue({ actor, mustChangePassword: false }, "demo");
   }
-  async login(username: string, password: string) {
+  async login(username: string, password: string, groupId: PortalGroup = "contabil") {
     // TEMPORARY: explicit local fixture access requested for UI testing. Remove before VPS release.
-    const testActor = localTestIdentity(username, password);
+    const testActor = localTestIdentity(username, password, process.env, groupId);
     if (testActor) {
       const identity = await this.identities.resolve(testActor);
       return this.issue(identity, "local-test");
     }
+    if (groupId !== "contabil") throw new UnauthorizedException("Seu usuário não possui acesso a este ambiente. Nesta etapa, utilize o acesso local de testes para os demais grupos.");
     if (!this.mfa)
       throw new ServiceUnavailableException(
         "Verificação por e-mail ainda não configurada.",
@@ -116,7 +118,7 @@ export class SessionService {
     }
     if (
       session.mode === "local-test" &&
-      (!localTestLoginEnabled() || session.actor.tenantId !== LOCAL_TEST_TENANT)
+      (!localTestLoginEnabled() || !Object.values(LOCAL_TEST_GROUPS).some((id) => id === session.actor.tenantId))
     ) {
       this.sessions.delete(token);
       throw new UnauthorizedException(

@@ -1,0 +1,147 @@
+/* "Lista limpa" — global visual layer chosen by the user on 17/10/2026
+   (Claude Code). Loaded after every module stylesheet through the #root
+   prefix: strong full borders on panels, status as a colored dot + text,
+   no pill badges, no initials squares, no colored row stripes. */
+:root {
+  --line: color-mix(in srgb, #15202b 15%, white);
+  --line-strong: color-mix(in srgb, #15202b 22%, white);
+}
+
+/* Panels and cards: one complete, legible outline; no floating shadows. */
+:is(#root, body) .surface,
+:is(#root, body) .metric-card,
+:is(#root, body) .model-card,
+:is(#root, body) .report-catalog,
+:is(#root, body) .info-box,
+:is(#root, body) .table-toolbar input,
+:is(#root, body) .filter-menu {
+  border: 1px solid var(--line-strong);
+  box-shadow: none;
+}
+
+/* Status: dot + text in the semantic color (no pill background or border). */
+:is(#root, body) .badge,
+:is(#root, body) .task-deadline {
+  min-height: 0;
+  padding: 0;
+  gap: 7px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+:is(#root, body) .badge::before,
+:is(#root, body) .task-deadline::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+:is(#root, body) .task-deadline > svg {
+  display: none;
+}
+:is(#root, body) .task-deadline-neutral {
+  color: var(--muted);
+}
+
+/* No initials squares in lists; no colored stripes on rows. */
+:is(#root, body) .company-monogram,
+:is(#root, body) .owner-cell .avatar {
+  display: none;
+}
+:is(#root, body) .task-table .task-row,
+:is(#root, body) .task-table .task-row td:first-child {
+  border-left: 0;
+}
+:is(#root, body) .company-cell {
+  gap: 0;
+}
+
+/* Table header: readable, not shouty. */
+:is(#root, body) .data-table th {
+  color: color-mix(in srgb, #15202b 70%, white);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+:is(#root, body) .data-table td {
+  border-bottom-color: var(--line);
+}
+
+/* The company name is the strongest text of a row. */
+:is(#root, body) .company-cell strong,
+:is(#root, body) .company-info strong {
+  color: #15202b;
+  font-weight: 600;
+}
+:is(#root, body) .company-cell span:not(.company-monogram):not(.company-info),
+:is(#root, body) .company-info > span {
+  color: var(--muted);
+}
+
+/* Report cells with a tone follow the same dot + text rule. */
+:is(#root, body) .report-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-weight: 600;
+}
+:is(#root, body) .report-badge::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* Any screen size (17/10/2026): page headings and their buttons wrap instead
+   of pushing the page wider. */
+.page-heading {
+  flex-wrap: wrap;
+}
+.page-heading > :first-child {
+  flex: 1 1 auto;
+  min-width: min(260px, 100%);
+}
+.heading-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Phones: page titles, descriptions and heading buttons centered (17/10/2026). */
+@media (max-width: 760px) {
+  :is(#root, body) .page-heading {
+    align-items: center;
+    text-align: center;
+  }
+  :is(#root, body) .page-heading > :first-child {
+    width: 100%;
+  }
+  :is(#root, body) .heading-actions {
+    justify-content: center;
+  }
+}
+
+/* Cells of a row share the same vertical center. */
+:is(#root, body) .data-table td {
+  vertical-align: middle;
+}
+
+/* Rows that open their record when clicked. */
+:is(#root, body) tr.row-clickable {
+  cursor: pointer;
+}
+:is(#root, body) tr.row-clickable:hover td {
+  background: color-mix(in srgb, #16afc4 5%, white);
+}

@@ -6,16 +6,29 @@ import {
   DomainError,
   MemoryRepository,
   PortalEngine,
+  SYSTEM_ACTOR_ID,
 } from "@apice/domain";
 import type {
   Actor,
   AuditEvent,
   DocumentVersion,
   PortalState,
+  ReportFilters,
   Task,
 } from "@apice/domain";
 import type { PortalStore, SecurityContext } from "./portal-store.js";
-const tables = ["users", "companies", "templates", "tasks", "audit"] as const;
+const tableNames = {
+  users: "users",
+  companies: "companies",
+  templates: "templates",
+  tasks: "tasks",
+  audit: "audit",
+  departmentFlows: "department_flows",
+  companyOnboardings: "company_onboardings",
+  workspaces: "workspace_settings",
+  changeProposals: "company_change_proposals",
+} as const;
+const tables = Object.keys(tableNames) as (keyof typeof tableNames)[];
 const idOf = (row: { id: string } | Actor) =>
   "userId" in row ? row.userId : row.id;
 const withoutDocuments = (task: Task) => {
@@ -35,10 +48,14 @@ export async function loadState(
     templates: [],
     tasks: [],
     audit: [],
+    departmentFlows: [],
+    companyOnboardings: [],
+    workspaces: [],
+    changeProposals: [],
   };
   for (const table of tables) {
     const result = await client.query<{ payload: unknown }>(
-      `SELECT payload FROM portal.${table} WHERE tenant_id=$1${table === "audit" ? " ORDER BY sequence DESC" : ""}`,
+      `SELECT payload FROM portal.${tableNames[table]} WHERE tenant_id=$1${table === "audit" ? " ORDER BY sequence DESC" : ""}`,
       [tenantId],
     );
     Object.assign(state, { [table]: result.rows.map((r) => r.payload) });
@@ -74,7 +91,7 @@ async function insertRecords(
     payload: row,
   }));
   await client.query(
-    `INSERT INTO portal.${table}(tenant_id,id,payload) SELECT $1,r.id,r.payload FROM jsonb_to_recordset($2::jsonb) AS r(id text,payload jsonb)`,
+    `INSERT INTO portal.${tableNames[table]}(tenant_id,id,payload) SELECT $1,r.id,r.payload FROM jsonb_to_recordset($2::jsonb) AS r(id text,payload jsonb)`,
     [tenantId, JSON.stringify(values)],
   );
 }
@@ -94,11 +111,70 @@ async function persist(
       (r) =>
         previous.has(idOf(r)) && previous.get(idOf(r)) !== JSON.stringify(r),
     );
-    if (modified.length)
+    if (modified.length && table === "users")
       throw new Error(
         "Alteração de cadastro ainda não suportada por este caso de uso.",
       );
     await insertRecords(client, table, tenantId, additions);
+    if (table === "companies")
+      for (const row of modified) {
+        const previousCompany = before.companies.find(
+          (company) => company.id === idOf(row),
+        )!;
+        const result = await client.query(
+          "UPDATE portal.companies SET payload=$3 WHERE tenant_id=$1 AND id=$2 AND COALESCE((payload->>'revision')::integer,1)=$4 RETURNING id",
+          [tenantId, idOf(row), row, previousCompany.revision ?? 1],
+        );
+        if (result.rowCount !== 1)
+          throw new DomainError(
+            "CONFLICT",
+            "O cadastro da empresa mudou.",
+            409,
+          );
+      }
+  }
+  for (const table of [
+    "departmentFlows",
+    "companyOnboardings",
+    "workspaces",
+    "changeProposals",
+  ] as const) {
+    const old = new Map(
+      (before[table] ?? []).map((record) => [record.id, record]),
+    );
+    await insertRecords(
+      client,
+      table,
+      tenantId,
+      (after[table] ?? []).filter((record) => !old.has(record.id)),
+    );
+    const updates = (after[table] ?? [])
+      .filter(
+        (record) =>
+          old.has(record.id) &&
+          JSON.stringify(old.get(record.id)) !== JSON.stringify(record),
+      )
+      .map((record) => ({
+        id: record.id,
+        version:
+          table === "departmentFlows"
+            ? (old.get(record.id) as { version: number }).version
+            : (old.get(record.id) as { revision: number }).revision,
+        payload: record,
+      }));
+    if (updates.length) {
+      const versionField = table === "departmentFlows" ? "version" : "revision";
+      const result = await client.query(
+        `UPDATE portal.${tableNames[table]} t SET payload=r.payload FROM jsonb_to_recordset($2::jsonb) AS r(id text,version integer,payload jsonb) WHERE t.tenant_id=$1 AND t.id=r.id AND (t.payload->>'${versionField}')::integer=r.version RETURNING t.id`,
+        [tenantId, JSON.stringify(updates)],
+      );
+      if (result.rowCount !== updates.length)
+        throw new DomainError(
+          "CONFLICT",
+          "O fluxo ou a implantação mudou. Atualize a lista.",
+          409,
+        );
+    }
   }
   const oldTemplates = new Map(
     before.templates.map((model) => [model.id, model]),
@@ -247,7 +323,11 @@ export class PostgresPortalStore implements PortalStore {
           [actor.tenantId],
         );
       const before = await loadState(client, actor.tenantId);
-      const resolved = before.users.find((u) => u.userId === actor.userId);
+      // Scheduled server work runs as the system identity, never as a session user.
+      const resolved =
+        actor.userId === SYSTEM_ACTOR_ID
+          ? structuredClone(actor)
+          : before.users.find((u) => u.userId === actor.userId);
       if (!resolved || resolved.active === false)
         throw new DomainError(
           "UNAUTHENTICATED",
@@ -280,6 +360,27 @@ export class PostgresPortalStore implements PortalStore {
       false,
     );
     return { ...snapshot, persistence: "postgres" as const };
+  }
+  async report(actor: Actor, filters: ReportFilters) {
+    return this.transaction(
+      actor,
+      async (_client, engine, resolved) => engine.report(resolved, filters),
+      false,
+    );
+  }
+  /** Groups to run scheduled work for; falls back to the configured group. */
+  async tenantIds(): Promise<string[]> {
+    try {
+      const result = await this.pool.query<{ id: string }>(
+        "SELECT id FROM portal.tenants ORDER BY id",
+      );
+      if (result.rows.length) return result.rows.map((row) => row.id);
+    } catch {
+      console.warn(
+        "Geração automática: lista de grupos indisponível; usando PORTAL_TENANT_ID.",
+      );
+    }
+    return [process.env.PORTAL_TENANT_ID ?? "apice-demo"];
   }
   async ping() {
     const probe = { text: "SELECT 1", query_timeout: 5000 };
@@ -463,6 +564,18 @@ export async function seedDatabase(
           table,
           tenantId,
           state[table].filter((r) => r.tenantId === tenantId),
+        );
+      for (const table of [
+        "departmentFlows",
+        "companyOnboardings",
+        "workspaces",
+        "changeProposals",
+      ] as const)
+        await insertRecords(
+          client,
+          table,
+          tenantId,
+          (state[table] ?? []).filter((row) => row.tenantId === tenantId),
         );
       const tasks = state.tasks.filter((t) => t.tenantId === tenantId);
       await insertRecords(

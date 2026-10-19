@@ -23,7 +23,9 @@ export function matchesSelection(
     model,
   } = selection;
   return (
+    (status === "cancelled" ? !!task.cancelled : !task.cancelled) &&
     (status === "all" ||
+      status === "cancelled" ||
       (status === "open"
         ? !closed
         : status === "closed"

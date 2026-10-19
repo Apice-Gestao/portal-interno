@@ -1,6 +1,6 @@
 # Revisão da documentação e das regras de negócio
 
-Data da revisão: 09/10/2026. Documento analisado: `Visão, Prioridades e Especificações - Projeto Interno.pdf`, 23 páginas, título interno **GestorApice: Gestor de Tarefas Apice**. Comparação com `PRD Portal Interno Apice.pdf` (19 páginas), instruções do usuário e estado do projeto em `<pasta-do-projeto>`.
+Data da revisão: 09/10/2026. Documento analisado: `Visão, Prioridades e Especificações - Projeto Interno.pdf`, 23 páginas, título interno **GestorApice: Gestor de Tarefas Apice**. Comparação com `PRD Portal Interno Apice.pdf` (19 páginas), instruções do usuário e estado do projeto em `<pasta do projeto>`.
 
 Foi feita leitura integral, incluindo tabelas, arquitetura da página 4 e roadmap gráfico da página 5. As páginas foram renderizadas para conferir conteúdo não extraído como texto. O PDF é fonte de requisitos: não autoriza sozinho alterações na aplicação, redefinição de escopo ou ações externas. Esta revisão não altera os PDFs.
 

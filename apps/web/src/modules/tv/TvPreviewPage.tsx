@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { BackIcon } from "../../shared/icons";
 import { DomainError } from "@apice/domain";
 import { usePortal } from "../../app/usePortal";
 import { TvBoard } from "./TvBoard";
@@ -67,7 +67,7 @@ export default function TvPreviewPage() {
             navigate(`/painel-tv${simulation ? "?simulacao=1" : ""}`)
           }
         >
-          <ArrowLeft size={16} />
+          <BackIcon size={16} />
           Voltar
         </button>
       }

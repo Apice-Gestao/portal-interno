@@ -2,6 +2,8 @@ import type {
   Actor,
   DocumentVersion,
   PortalEngine,
+  ReportFilters,
+  ReportResult,
   Snapshot,
 } from "@apice/domain";
 export interface SecurityContext {
@@ -12,7 +14,10 @@ export interface SecurityContext {
 export interface PortalStore {
   readonly mode: "memory" | "postgres";
   ping(): Promise<void>;
+  /** Groups (tenants) the scheduled automatic generation runs for. */
+  tenantIds(): Promise<string[]>;
   snapshot(actor: Actor): Promise<Snapshot>;
+  report(actor: Actor, filters: ReportFilters): Promise<ReportResult>;
   run<T>(
     actor: Actor,
     operation: (engine: PortalEngine, resolved: Actor) => T,

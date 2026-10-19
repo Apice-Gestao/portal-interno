@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
-  AlertCircle,
-  CalendarDays,
-  Check,
-  Clock3,
-  Maximize,
-  Minimize,
-  Radio,
-  WifiOff,
-} from "lucide-react";
+  ConnectionWarningIcon,
+  CalendarIcon,
+  CheckIcon,
+  ClockIcon,
+  ExpandIcon,
+  CollapseIcon,
+  LiveBroadcastIcon,
+  OfflineIcon,
+} from "../../shared/icons";
 import type { TvBlock, TvFeed } from "@apice/domain";
 import "./tv.css";
 
@@ -140,7 +140,7 @@ function Panel({
 function Empty({ children }: { children: ReactNode }) {
   return (
     <div className="tv-empty">
-      <Check size={24} aria-hidden="true" />
+      <CheckIcon size={24} aria-hidden="true" />
       <p>{children}</p>
     </div>
   );
@@ -377,31 +377,31 @@ function Deadlines({ feed }: { feed: TvFeed }) {
       label: "No prazo",
       value: feed.deadlines.onTime,
       style: "neutral",
-      icon: Clock3,
+      icon: ClockIcon,
     },
     {
       label: "Vencem hoje",
       value: feed.deadlines.dueToday,
       style: "today",
-      icon: CalendarDays,
+      icon: CalendarIcon,
     },
     {
       label: "Meta vencida",
       value: feed.deadlines.internalLate,
       style: "warning",
-      icon: AlertCircle,
+      icon: ConnectionWarningIcon,
     },
     {
       label: "Prazo vencido",
       value: feed.deadlines.legalLate,
       style: "danger",
-      icon: AlertCircle,
+      icon: ConnectionWarningIcon,
     },
     {
       label: "Encerradas",
       value: feed.deadlines.done,
       style: "success",
-      icon: Check,
+      icon: CheckIcon,
     },
   ];
   return (
@@ -542,7 +542,7 @@ export function TvBoard({
         </div>
         <div className="tv-header-end">
           <span className={`tv-connection ${live ? "is-live" : "is-stale"}`}>
-            {live ? <Radio size={14} /> : <WifiOff size={14} />}
+            {live ? <LiveBroadcastIcon size={14} /> : <OfflineIcon size={14} />}
             {simulation ? "SIMULAÇÃO" : live ? "AO VIVO" : "DESATUALIZADO"}
           </span>
           <time className="tv-clock">{timeLabel(clock)}</time>
@@ -551,7 +551,7 @@ export function TvBoard({
             aria-label={fullscreen ? "Sair da tela cheia" : "Tela cheia"}
             onClick={() => void toggleFullscreen()}
           >
-            {fullscreen ? <Minimize size={19} /> : <Maximize size={19} />}
+            {fullscreen ? <CollapseIcon size={19} /> : <ExpandIcon size={19} />}
           </button>
           {actions}
         </div>

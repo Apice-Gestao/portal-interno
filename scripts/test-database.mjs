@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { randomUUID, createHash } from "node:crypto";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { randomUUID, createHash, randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,43 +32,97 @@ import {
 } from "../apps/api/dist/database/data-transfer.js";
 import { createApplication } from "../apps/api/dist/bootstrap.js";
 import { hashPassword } from "../apps/api/dist/security/password.js";
+import { RecoveryService } from "../apps/api/dist/security/recovery.service.js";
 import { PERMISSIONS } from "../packages/domain/dist/index.js";
 const root = fileURLToPath(new URL("../", import.meta.url));
-process.env.ENABLE_DEMO_SESSIONS = "true";
 if (existsSync(path.join(root, ".env")))
   process.loadEnvFile(path.join(root, ".env"));
-process.env.ENABLE_LOCAL_TEST_LOGIN = "false";
 const migrationUrl = new URL(process.env.MIGRATION_DATABASE_URL);
 const runtimeUrl = new URL(process.env.DATABASE_URL);
-assert.ok(
-  ["127.0.0.1", "localhost"].includes(migrationUrl.hostname),
-  "Testes de destruição de fixtures só podem executar em PostgreSQL local.",
-);
+for (const url of [migrationUrl, runtimeUrl]) {
+  assert.ok(
+    ["127.0.0.1", "localhost"].includes(url.hostname),
+    "Testes de destruição de fixtures só podem executar em PostgreSQL local.",
+  );
+  assert.equal(url.port, "55432", "Use somente a instância local dedicada.");
+  assert.ok(["postgres:", "postgresql:"].includes(url.protocol));
+}
 const suffix = randomUUID().replaceAll("-", "").slice(0, 12);
 const database = `apice_test_${suffix}`;
 const restoreDatabase = `apice_test_restore_${suffix}`;
 const portableDatabase = `apice_test_portable_${suffix}`;
+const privateDirectory = path.join(
+  root,
+  ".local",
+  "verification",
+  `database-${suffix}`,
+);
+const reportFile = path.join(
+  root,
+  ".local",
+  "verification",
+  "database-massive.json",
+);
+Object.assign(process.env, {
+  NODE_ENV: "development",
+  PORTAL_STORAGE: "postgres",
+  PORTAL_TENANT_ID: "apice-demo",
+  ENABLE_DEMO_SESSIONS: "true",
+  ENABLE_LOCAL_TEST_LOGIN: "false",
+  MAIL_DELIVERY: "local",
+  MAIL_OUTBOX_DIR: path.join(privateDirectory, "mail"),
+  PORTAL_PUBLIC_URL: "http://127.0.0.1:5173",
+  MFA_SECRET: randomBytes(32).toString("hex"),
+});
 const created = [];
 const adminUrl = new URL(migrationUrl);
 adminUrl.pathname = "/postgres";
 const adminPool = new pg.Pool({ connectionString: adminUrl.href });
 let ownerPool, store, app, restorePool, portablePool;
 const report = {
+  schemaVersion: 2,
   startedAt: new Date().toISOString(),
   databaseEngine: "PostgreSQL",
+  scope:
+    "API, autorização, documentos, carga, RLS, identidade com MFA local e recuperação em bases descartáveis na instância dedicada; sem acesso à base principal.",
   checks: [],
   load: {},
   fixtures: {},
+  cleanup: {},
 };
 async function check(name, fn) {
   const start = performance.now();
-  await fn();
-  report.checks.push({
-    name,
-    status: "passed",
-    ms: Math.round(performance.now() - start),
-  });
+  try {
+    await fn();
+    report.checks.push({
+      name,
+      status: "passed",
+      ms: Math.round(performance.now() - start),
+    });
+  } catch (error) {
+    report.checks.push({
+      name,
+      status: "failed",
+      ms: Math.round(performance.now() - start),
+      failure: safeError(error),
+    });
+    throw error;
+  }
   console.log(`✓ ${name}`);
+}
+function safeError(error) {
+  let message = String(error?.message ?? error).split("\n")[0];
+  for (const secret of [
+    migrationUrl.href,
+    runtimeUrl.href,
+    decodeURIComponent(migrationUrl.password),
+    decodeURIComponent(runtimeUrl.password),
+    process.env.MFA_SECRET,
+  ])
+    if (secret) message = message.replaceAll(secret, "[redacted]");
+  return message
+    .replace(/postgres(?:ql)?:\/\/[^\s]+/gi, "[redacted database URL]")
+    .slice(0, 500);
 }
 function dbUrl(url, name) {
   const value = new URL(url);
@@ -72,8 +133,79 @@ const actor = users[0],
   manager = users[2],
   adminActor = users[3];
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
+const disposableName = (name) => {
+  assert.ok([database, restoreDatabase, portableDatabase].includes(name));
+  assert.match(name, /^apice_test_(?:(?:restore|portable)_)?[a-f0-9]{12}$/);
+  return pg.escapeIdentifier(name);
+};
+const mailFiles = () =>
+  existsSync(process.env.MAIL_OUTBOX_DIR)
+    ? readdirSync(process.env.MAIL_OUTBOX_DIR)
+    : [];
+function newMail(before, email, field) {
+  const messages = mailFiles()
+    .filter((file) => !before.has(file))
+    .map((file) =>
+      JSON.parse(
+        readFileSync(path.join(process.env.MAIL_OUTBOX_DIR, file), "utf8"),
+      ),
+    )
+    .filter(
+      (message) => message.to === email && typeof message[field] === "string",
+    );
+  assert.equal(
+    messages.length,
+    1,
+    "Entrega local deve produzir exatamente uma mensagem para a conta de fixture.",
+  );
+  return messages[0][field];
+}
+async function beginLogin(http, username, password, email) {
+  const before = new Set(mailFiles());
+  const login = await request(http)
+    .post("/api/v1/login")
+    .send({ username, password })
+    .expect(201);
+  assert.equal(login.body.requiresSecondFactor, true);
+  assert.equal("token" in login.body, false, "Senha isolada não emite sessão.");
+  assert.equal(login.body.needsEmail, false);
+  assert.match(login.body.challengeId, /^[A-Za-z0-9_-]{43}$/);
+  return {
+    challengeId: login.body.challengeId,
+    code: newMail(before, email, "code"),
+  };
+}
+async function finishLogin(
+  http,
+  username,
+  password,
+  email,
+  rejectWrongCode = false,
+) {
+  const factor = await beginLogin(http, username, password, email);
+  if (rejectWrongCode) {
+    await request(http)
+      .get("/api/v1/snapshot")
+      .set("Authorization", `Bearer ${factor.challengeId}`)
+      .expect(401);
+    await request(http)
+      .post("/api/v1/login/verify")
+      .send({ ...factor, code: factor.code === "000000" ? "000001" : "000000" })
+      .expect(401);
+  }
+  const verified = await request(http)
+    .post("/api/v1/login/verify")
+    .send(factor)
+    .expect(201);
+  assert.equal(verified.body.mode, "password");
+  assert.ok(verified.body.token);
+  await request(http).post("/api/v1/login/verify").send(factor).expect(401);
+  report.fixtures.verifiedMfaLogins =
+    (report.fixtures.verifiedMfaLogins ?? 0) + 1;
+  return verified;
+}
 try {
-  await adminPool.query(`CREATE DATABASE ${pg.escapeIdentifier(database)}`);
+  await adminPool.query(`CREATE DATABASE ${disposableName(database)}`);
   created.push(database);
   ownerPool = new pg.Pool({ connectionString: dbUrl(migrationUrl, database) });
   await check(
@@ -81,14 +213,26 @@ try {
     async () => {
       await migrateDatabase(ownerPool, runtimeUrl.username);
       await migrateDatabase(ownerPool, runtimeUrl.username);
-      assert.equal(
-        (
-          await ownerPool.query(
-            "SELECT count(*)::integer AS n FROM portal_meta.migrations",
-          )
-        ).rows[0].n,
-        3,
+      const applied = (
+        await ownerPool.query(
+          "SELECT name,checksum FROM portal_meta.migrations ORDER BY name",
+        )
+      ).rows;
+      const expected = readdirSync(path.join(root, "supabase", "migrations"))
+        .filter((name) => name.endsWith(".sql"))
+        .sort()
+        .map((name) => ({
+          name,
+          checksum: sha(
+            readFileSync(path.join(root, "supabase", "migrations", name)),
+          ),
+        }));
+      assert.ok(
+        expected.length >= 12,
+        "A suíte exige as migrações atuais do projeto.",
       );
+      assert.deepEqual(applied, expected);
+      report.fixtures.migrations = applied.length;
     },
   );
   const state = createSeed();
@@ -172,6 +316,16 @@ try {
       } finally {
         client.release();
       }
+    },
+  );
+  await check(
+    "geração automática enxerga todos os grupos com o papel de execução, só pelo ID",
+    async () => {
+      assert.deepEqual(await store.tenantIds(), ["apice-demo", "tenant-b"]);
+      await assert.rejects(
+        store.pool.query("SELECT name FROM portal.tenants"),
+        /permission denied/,
+      );
     },
   );
   await check(
@@ -567,7 +721,7 @@ try {
     },
   );
   await check(
-    "backend revalida o papel persistido mesmo com sessão antiga ou ator forjado",
+    "backend usa concessões persistidas: cargo não remove acessos e revogação vale na sessão antiga",
     async () => {
       await assert.rejects(
         store.run({ ...actor, role: "admin" }, (engine, resolved) =>
@@ -582,15 +736,32 @@ try {
         (e) => e.code === "FORBIDDEN",
       );
       await ownerPool.query(
-        "UPDATE portal.users SET payload=jsonb_set(payload,'{role}','\"viewer\"') WHERE tenant_id='apice-demo' AND id='julia'",
+        "UPDATE portal.users SET payload=jsonb_set(jsonb_set(payload,'{role}','\"viewer\"'),'{permissions}',$1::jsonb) WHERE tenant_id='apice-demo' AND id='julia'",
+        [JSON.stringify(["tasks.view", "tasks.create", "tasks.execute"])],
       );
       try {
+        // O usuário autorizou qualquer cargo a receber qualquer concessão.
+        await auth("post", "/api/v1/tasks")
+          .send({ ...body, title: "Cargo de consulta com concessão explícita" })
+          .expect(201);
+        await ownerPool.query(
+          "UPDATE portal.users SET payload=jsonb_set(payload,'{permissions}',$1::jsonb) WHERE tenant_id='apice-demo' AND id='julia'",
+          [JSON.stringify(["tasks.view"])],
+        );
         await auth("post", "/api/v1/tasks").send(body).expect(403);
         const result = await auth("get", "/api/v1/snapshot").expect(200);
         assert.equal(result.body.actor.role, "viewer");
       } finally {
         await ownerPool.query(
-          "UPDATE portal.users SET payload=jsonb_set(payload,'{role}','\"operator\"') WHERE tenant_id='apice-demo' AND id='julia'",
+          "UPDATE portal.users SET payload=$1::jsonb WHERE tenant_id='apice-demo' AND id='julia'",
+          [
+            JSON.stringify(
+              state.users.find(
+                (user) =>
+                  user.tenantId === "apice-demo" && user.userId === "julia",
+              ),
+            ),
+          ],
         );
       }
     },
@@ -731,9 +902,8 @@ try {
         "INSERT INTO portal.credentials(tenant_id,user_id,login,password_hash,active) VALUES($1,$2,$3,$4,false)",
         ["apice-demo", "consulta", "fixture-consulta", credential],
       );
-      const dir = path.join(root, ".local", "tests");
-      mkdirSync(dir, { recursive: true });
-      const file = path.join(dir, `restore-${suffix}.dump`);
+      mkdirSync(privateDirectory, { recursive: true, mode: 0o700 });
+      const file = path.join(privateDirectory, "restore.dump");
       const bin =
         process.env.PG_BIN_DIR ?? "C:/Program Files/PostgreSQL/18/bin";
       const env = {
@@ -767,7 +937,7 @@ try {
         file,
       ]);
       await adminPool.query(
-        `CREATE DATABASE ${pg.escapeIdentifier(restoreDatabase)}`,
+        `CREATE DATABASE ${disposableName(restoreDatabase)}`,
       );
       created.push(restoreDatabase);
       run("pg_restore", [
@@ -796,6 +966,13 @@ try {
         "documents",
         "audit",
         "credentials",
+        "password_reset_tokens",
+        "email_mfa_challenges",
+        "tv_devices",
+        "workspace_settings",
+        "company_change_proposals",
+        "department_flows",
+        "company_onboardings",
       ])
         assert.equal(
           (
@@ -826,7 +1003,7 @@ try {
     "exportação portátil valida hashes, preserva tenants/IDs repetidos e importa atomicamente",
     async () => {
       await adminPool.query(
-        `CREATE DATABASE ${pg.escapeIdentifier(portableDatabase)}`,
+        `CREATE DATABASE ${disposableName(portableDatabase)}`,
       );
       created.push(portableDatabase);
       portablePool = new pg.Pool({
@@ -910,8 +1087,14 @@ try {
         ["apice-demo", adminActor.userId, JSON.stringify(PERMISSIONS)],
       );
       await ownerPool.query(
-        "INSERT INTO portal.credentials(tenant_id,user_id,login,password_hash) VALUES($1,$2,$3,$4)",
-        ["apice-demo", adminActor.userId, "identity-admin", hash],
+        "INSERT INTO portal.credentials(tenant_id,user_id,login,password_hash,email,email_verified) VALUES($1,$2,$3,$4,$5,true)",
+        [
+          "apice-demo",
+          adminActor.userId,
+          "identity-admin",
+          hash,
+          "admin.database@example.invalid",
+        ],
       );
       app = await createApplication();
       await app.listen(0, "127.0.0.1");
@@ -920,13 +1103,13 @@ try {
         .post("/api/v1/login")
         .send({ username: "identity-admin", password: "wrong" })
         .expect(401);
-      const login = await request(http)
-        .post("/api/v1/login")
-        .send({
-          username: "identity-admin",
-          password: "IdentityTemporary2026!",
-        })
-        .expect(201);
+      const login = await finishLogin(
+        http,
+        "identity-admin",
+        "IdentityTemporary2026!",
+        "admin.database@example.invalid",
+        true,
+      );
       const bearer = `Bearer ${login.body.token}`;
       await request(http)
         .get("/api/v1/snapshot")
@@ -943,6 +1126,7 @@ try {
       const inputs = {
         name: "Operador com acessos concedidos",
         username: "operator-granted",
+        email: "operator.database@example.invalid",
         password: "OperatorTemporary2026!",
         role: "operator",
         departments: ["Fiscal"],
@@ -980,10 +1164,12 @@ try {
           permissions: ["tasks.execute"],
         })
         .expect(400);
-      const opLogin = await request(http)
-        .post("/api/v1/login")
-        .send({ username: inputs.username, password: inputs.password })
-        .expect(201);
+      const opLogin = await finishLogin(
+        http,
+        inputs.username,
+        inputs.password,
+        inputs.email,
+      );
       const opBearer = `Bearer ${opLogin.body.token}`;
       await request(http)
         .post("/api/v1/password")
@@ -993,6 +1179,11 @@ try {
           newPassword: "OperatorUpdated2026!",
         })
         .expect(201);
+      const verifiedEmail = await ownerPool.query(
+        "SELECT email_verified FROM portal.credentials WHERE tenant_id=$1 AND user_id=$2",
+        ["apice-demo", created.body.userId],
+      );
+      assert.equal(verifiedEmail.rows[0].email_verified, true);
       await request(http)
         .get("/api/v1/users")
         .set("Authorization", opBearer)
@@ -1020,10 +1211,12 @@ try {
         .get("/api/v1/snapshot")
         .set("Authorization", opBearer)
         .expect(401);
-      const reset = await request(http)
-        .post("/api/v1/login")
-        .send({ username: inputs.username, password: "ResetTemporary2026!" })
-        .expect(201);
+      const reset = await finishLogin(
+        http,
+        inputs.username,
+        "ResetTemporary2026!",
+        inputs.email,
+      );
       await request(http)
         .patch(`/api/v1/users/${created.body.userId}`)
         .set("Authorization", bearer)
@@ -1039,32 +1232,228 @@ try {
         .expect(403);
     },
   );
+  await check(
+    "MFA PostgreSQL: código errado, cinco tentativas, reenvio antecipado e ausência de segredos em claro no banco",
+    async () => {
+      const http = app.getHttpServer();
+      const factor = await beginLogin(
+        http,
+        "identity-admin",
+        "IdentityUpdated2026!",
+        "admin.database@example.invalid",
+      );
+      const row = (
+        await ownerPool.query(
+          "SELECT token_hash,code_hash FROM portal.email_mfa_challenges WHERE token_hash=$1",
+          [sha(factor.challengeId)],
+        )
+      ).rows[0];
+      assert.match(row.token_hash, /^[a-f0-9]{64}$/);
+      assert.match(row.code_hash, /^[a-f0-9]{64}$/);
+      assert.notEqual(row.token_hash, factor.challengeId);
+      assert.notEqual(row.code_hash, factor.code);
+      await request(http)
+        .post("/api/v1/login/resend")
+        .send({ challengeId: factor.challengeId })
+        .expect(429);
+      const wrongCode = factor.code === "000000" ? "000001" : "000000";
+      for (let attempt = 0; attempt < 5; attempt++)
+        await request(http)
+          .post("/api/v1/login/verify")
+          .send({ ...factor, code: wrongCode })
+          .expect(401);
+      await request(http).post("/api/v1/login/verify").send(factor).expect(401);
+      const consumed = (
+        await ownerPool.query(
+          "SELECT attempts,consumed_at FROM portal.email_mfa_challenges WHERE token_hash=$1",
+          [sha(factor.challengeId)],
+        )
+      ).rows[0];
+      assert.equal(consumed.attempts, 5);
+      assert.ok(consumed.consumed_at);
+    },
+  );
+  await check(
+    "recuperação PostgreSQL: resposta neutra, link de uso único concorrente, sessão revogada e expiração",
+    async () => {
+      const http = app.getHttpServer();
+      const email = "admin.database@example.invalid";
+      const beforeLogin = await finishLogin(
+        http,
+        "identity-admin",
+        "IdentityUpdated2026!",
+        email,
+      );
+      const emptyOutbox = new Set(mailFiles());
+      const absent = await request(http)
+        .post("/api/v1/password/forgot")
+        .send({ email: "absent.database@example.invalid" })
+        .expect(201);
+      await app.get(RecoveryService).waitForDeliveries();
+      assert.deepEqual(new Set(mailFiles()), emptyOutbox);
+      const before = new Set(mailFiles());
+      const known = await request(http)
+        .post("/api/v1/password/forgot")
+        .send({ email })
+        .expect(201);
+      assert.deepEqual(known.body, absent.body);
+      assert.deepEqual(known.body, { accepted: true });
+      await app.get(RecoveryService).waitForDeliveries();
+      const link = new URL(newMail(before, email, "link"));
+      const token = new URLSearchParams(link.hash.split("?")[1]).get("token");
+      assert.match(token, /^[A-Za-z0-9_-]{43}$/);
+      const resets = await Promise.all(
+        Array.from({ length: 2 }, () =>
+          request(http)
+            .post("/api/v1/password/reset")
+            .send({ token, newPassword: "RecoveryDatabaseUpdated2026!" }),
+        ),
+      );
+      assert.equal(resets.filter((result) => result.status === 201).length, 1);
+      assert.equal(resets.filter((result) => result.status === 400).length, 1);
+      await request(http)
+        .get("/api/v1/session")
+        .set("Authorization", `Bearer ${beforeLogin.body.token}`)
+        .expect(401);
+      const recovered = await finishLogin(
+        http,
+        "identity-admin",
+        "RecoveryDatabaseUpdated2026!",
+        email,
+      );
+      assert.equal(recovered.body.mustChangePassword, false);
+      const expiresBefore = new Set(mailFiles());
+      await request(http)
+        .post("/api/v1/password/forgot")
+        .send({ email })
+        .expect(201);
+      await app.get(RecoveryService).waitForDeliveries();
+      const expiredLink = new URL(newMail(expiresBefore, email, "link"));
+      const expiredToken = new URLSearchParams(
+        expiredLink.hash.split("?")[1],
+      ).get("token");
+      await ownerPool.query(
+        "UPDATE portal.password_reset_tokens SET created_at=now()-interval '31 minutes',expires_at=now()-interval '1 minute' WHERE token_hash=$1",
+        [sha(expiredToken)],
+      );
+      await request(http)
+        .post("/api/v1/password/reset")
+        .send({ token: expiredToken, newPassword: "MustNotApplyDatabase2026!" })
+        .expect(429);
+      // Expiry is a separate assertion from the intentionally reached recovery rate limit.
+      const expiryApp = await createApplication();
+      try {
+        await expiryApp.listen(0, "127.0.0.1");
+        await request(expiryApp.getHttpServer())
+          .post("/api/v1/password/reset")
+          .send({
+            token: expiredToken,
+            newPassword: "MustNotApplyDatabase2026!",
+          })
+          .expect(400);
+      } finally {
+        await expiryApp.close();
+      }
+      await request(http)
+        .get("/api/v1/session")
+        .set("Authorization", `Bearer ${recovered.body.token}`)
+        .expect(200);
+    },
+  );
+  await check(
+    "oito verificações MFA concorrentes em uma instância nova emitem uma única sessão",
+    async () => {
+      // Reinitializar o processo é outro cenário de ciclo de vida, sem modificar limites reais.
+      await app.close();
+      app = undefined;
+      app = await createApplication();
+      await app.listen(0, "127.0.0.1");
+      const http = app.getHttpServer();
+      const factor = await beginLogin(
+        http,
+        "identity-admin",
+        "RecoveryDatabaseUpdated2026!",
+        "admin.database@example.invalid",
+      );
+      const verified = await Promise.all(
+        Array.from({ length: 8 }, () =>
+          request(http).post("/api/v1/login/verify").send(factor),
+        ),
+      );
+      assert.equal(
+        verified.filter((result) => result.status === 201).length,
+        1,
+      );
+      assert.equal(
+        verified.filter((result) => result.status === 401).length,
+        7,
+      );
+      report.load.concurrentMfaVerifications = 8;
+    },
+  );
   report.finishedAt = new Date().toISOString();
   report.status = "passed";
 } catch (error) {
   report.status = "failed";
-  report.failure = error.message;
-  console.error("Teste falhou:", error.message);
+  report.failure = safeError(error);
+  console.error("Teste falhou:", safeError(error));
   process.exitCode = 1;
 } finally {
-  await app?.close();
-  await store?.close();
-  await ownerPool?.end();
-  await restorePool?.end();
-  await portablePool?.end();
+  const cleanupErrors = [];
+  async function cleanup(name, operation) {
+    try {
+      await operation();
+    } catch (error) {
+      cleanupErrors.push({ name, failure: safeError(error) });
+    }
+  }
+  await cleanup("API", async () => app?.close());
+  await cleanup("adaptador", async () => store?.close());
+  await cleanup("conexão proprietária", async () => ownerPool?.end());
+  await cleanup("conexão de restauração", async () => restorePool?.end());
+  await cleanup("conexão portátil", async () => portablePool?.end());
   for (const name of created) {
-    assert.ok([database, restoreDatabase, portableDatabase].includes(name));
-    await adminPool.query(
-      `DROP DATABASE ${pg.escapeIdentifier(name)} WITH (FORCE)`,
+    await cleanup("base descartável", async () =>
+      adminPool.query(`DROP DATABASE ${disposableName(name)} WITH (FORCE)`),
     );
   }
-  await adminPool.end();
-  mkdirSync(path.join(root, "docs", "auditoria"), { recursive: true });
-  writeFileSync(
-    path.join(root, "docs", "auditoria", "testes-postgres.json"),
-    JSON.stringify(report, null, 2) + "\n",
-  );
+  await cleanup("verificação das bases descartáveis", async () => {
+    const remaining = await adminPool.query(
+      "SELECT count(*)::integer AS n FROM pg_database WHERE datname=ANY($1::text[])",
+      [[database, restoreDatabase, portableDatabase]],
+    );
+    assert.equal(remaining.rows[0].n, 0);
+    report.cleanup.temporaryDatabasesRemoved = created.length;
+  });
+  await cleanup("conexão administrativa", async () => adminPool.end());
+  await cleanup("arquivos privados temporários", async () => {
+    const resolved = path.resolve(privateDirectory);
+    const expected = path.resolve(
+      root,
+      ".local",
+      "verification",
+      `database-${suffix}`,
+    );
+    assert.equal(resolved, expected);
+    assert.equal(
+      path.dirname(resolved),
+      path.resolve(root, ".local", "verification"),
+    );
+    rmSync(resolved, { force: true, recursive: true });
+    report.cleanup.privateFixturesRemoved = true;
+  });
+  report.cleanup.errors = cleanupErrors;
+  if (cleanupErrors.length) {
+    report.status = "failed";
+    process.exitCode = 1;
+  }
+  report.finishedAt = new Date().toISOString();
+  report.durationMs = Date.now() - new Date(report.startedAt).getTime();
+  mkdirSync(path.dirname(reportFile), { recursive: true, mode: 0o700 });
+  writeFileSync(reportFile, JSON.stringify(report, null, 2) + "\n", {
+    mode: 0o600,
+  });
   console.log(
-    `Resultado: ${report.status}; ${report.checks.length} cenários PostgreSQL. Instâncias de teste removidas; banco do portal preservado.`,
+    `Resultado: ${report.status}; ${report.checks.filter((item) => item.status === "passed").length}/${report.checks.length} cenários PostgreSQL. Limpeza ${cleanupErrors.length ? "com falhas" : "confirmada"}; banco do portal preservado.`,
   );
 }

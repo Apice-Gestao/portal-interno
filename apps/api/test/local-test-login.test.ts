@@ -10,6 +10,7 @@ import type { AuthRequest } from "../dist/security/auth.guard.js";
 import type { PortalService } from "../dist/portal/portal.service.js";
 import {
   LOCAL_TEST_TENANT,
+  LOCAL_TEST_GROUPS,
   localTestIdentity,
   localTestLoginEnabled,
 } from "../dist/security/local-test-login.js";
@@ -57,6 +58,30 @@ function setup() {
 }
 afterEach(() => vi.unstubAllEnvs());
 describe("Temporary isolated local login", () => {
+  it.each(Object.entries(LOCAL_TEST_GROUPS))(
+    "isolates the %s demonstration in its fixture tenant",
+    async (groupId, tenantId) => {
+      const { sessions, identities } = setup();
+      const result = await sessions.login(
+        "admin",
+        "admin",
+        groupId as keyof typeof LOCAL_TEST_GROUPS,
+      );
+      if (!("token" in result)) throw new Error("Expected test session");
+      expect(result.actor.tenantId).toBe(tenantId);
+      expect((await sessions.resolve(`Bearer ${result.token}`)).tenantId).toBe(
+        tenantId,
+      );
+      expect(identities.authenticate).not.toHaveBeenCalled();
+    },
+  );
+  it("does not authenticate normal accounts in an unconfigured group", async () => {
+    const { sessions, identities } = setup();
+    await expect(
+      sessions.login("normal", "password", "go"),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(identities.authenticate).not.toHaveBeenCalled();
+  });
   it("blocks fixture password resets while preserving grants and normal account resets", async () => {
     const identities = { update: vi.fn(async () => ({})) };
     const sessions = { revokeUser: vi.fn() };

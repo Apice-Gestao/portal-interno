@@ -10,6 +10,7 @@ import {
   deadline,
   commandSchema,
   csvCell,
+  cnpjFromBase,
 } from "../src/index.js";
 import type { Actor, Task } from "../src/types.js";
 const julia = users.find((u) => u.userId === "julia")!;
@@ -333,7 +334,7 @@ describe("operational invariants", () => {
   it("keeps batch import atomic and repeat imports idempotent", () => {
     const valid = {
       name: "Teste Fictício",
-      cnpj: "00.000.099/0001-00",
+      cnpj: cnpjFromBase("000000990001"),
       regime: "Simples Nacional",
       city: "São Paulo",
       ownerId: "julia",
@@ -342,7 +343,7 @@ describe("operational invariants", () => {
     expect(() =>
       engine.importCompanies(rafael, [
         valid,
-        { ...valid, cnpj: "00.000.098/0001-00", ownerId: "outsider" },
+        { ...valid, cnpj: cnpjFromBase("000000980001"), ownerId: "outsider" },
       ]),
     ).toThrow("Responsável");
     expect(repository.read()).toEqual(before);

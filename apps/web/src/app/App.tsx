@@ -1,38 +1,45 @@
 import { lazy, Suspense, useState } from "react";
 import type { ReactNode } from "react";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import {
-  NavLink,
-  Navigate,
-  Route,
-  Routes,
-  useLocation,
-} from "react-router-dom";
+  DashboardIcon,
+  TaskChecklistIcon,
+  CompanyIcon,
+  DocumentVaultIcon,
+  AnalyticsIcon,
+  OfficeSettingsIcon,
+  UserAccessIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  MenuIcon,
+  CloseIcon,
+  SignOutIcon,
+  NotificationIcon,
+  TvDisplayIcon,
+  SidebarCollapseIcon,
+  SidebarExpandIcon,
+  ProcessIcon,
+  ChangeReviewIcon,
+} from "../shared/icons";
 import {
-  LayoutDashboard,
-  ListTodo,
-  Building2,
-  Layers3,
-  FolderOpen,
-  ChartNoAxesCombined,
-  Settings2,
-  UsersRound,
-  ChevronDown,
-  Menu,
-  X,
-  LogOut,
-  Bell,
-  Monitor,
-} from "lucide-react";
-import { hasPermission, metric, roleLabels } from "@apice/domain";
-import type { Department, Permission } from "@apice/domain";
+  hasPermission,
+  businessTime,
+  roleLabels,
+  departmentPositionLabel,
+} from "@apice/domain";
+import type { Actor, Department, Permission } from "@apice/domain";
 import { PortalProvider } from "./PortalContext";
 import { usePortal } from "./usePortal";
 import { EmptyState, Modal } from "../shared/ui/components";
+import { DemoTour } from "../shared/ui/DemoTour";
+import { PreviewBlockedNotice } from "../shared/ui/PreviewBlockedNotice";
 import { SelectField } from "../shared/ui/SelectField";
+import { useOrganization } from "./OrganizationContext";
+import "./shell.css";
+import { NavigationMenu } from "./NavigationMenu";
 const Tasks = lazy(() => import("../modules/tasks/TasksPage"));
 const Overview = lazy(() => import("../modules/overview/OverviewPage"));
 const Companies = lazy(() => import("../modules/companies/CompaniesPage"));
-const Templates = lazy(() => import("../modules/templates/TemplatesPage"));
 const Documents = lazy(() => import("../modules/documents/DocumentsPage"));
 const Reports = lazy(() => import("../modules/reports/ReportsPage"));
 const Settings = lazy(() => import("../modules/settings/SettingsPage"));
@@ -40,76 +47,103 @@ const Users = lazy(() => import("../modules/users/UsersPage"));
 const Tv = lazy(() => import("../modules/tv/TvPage"));
 const TvPreview = lazy(() => import("../modules/tv/TvPreviewPage"));
 const TvWatch = lazy(() => import("../modules/tv/TvWatchPage"));
+const Processes = lazy(() => import("../modules/processes/ProcessesPage"));
+const Manager = lazy(() => import("../modules/changes/ChangesPage"));
 const navigation: {
   path: string;
   label: string;
-  icon: typeof ListTodo;
-  permission: Permission;
+  icon: typeof TaskChecklistIcon;
+  // Any of the listed grants opens the item.
+  permission: Permission | Permission[];
 }[] = [
   {
     path: "/visao-geral",
     label: "Visão geral",
-    icon: LayoutDashboard,
+    icon: DashboardIcon,
     permission: "overview.view",
   },
   {
     path: "/tarefas",
     label: "Minhas tarefas",
-    icon: ListTodo,
+    icon: TaskChecklistIcon,
     permission: "tasks.view",
   },
   {
     path: "/empresas",
     label: "Empresas e carteira",
-    icon: Building2,
+    icon: CompanyIcon,
     permission: "companies.view",
   },
   {
-    path: "/modelos",
-    label: "Modelos de tarefa",
-    icon: Layers3,
-    permission: "templates.view",
+    // Task templates live inside "Fluxos e processos" since 17/10/2026.
+    path: "/processos",
+    label: "Fluxos e processos",
+    icon: ProcessIcon,
+    permission: ["processes.view", "templates.view"],
+  },
+  {
+    path: "/gestor",
+    label: "Central do gestor",
+    icon: ChangeReviewIcon,
+    // Department managers see their team; company changes need changes.manage.
+    permission: ["tasks.team.view", "changes.manage"],
   },
   {
     path: "/documentos",
     label: "Documentos",
-    icon: FolderOpen,
+    icon: DocumentVaultIcon,
     permission: "documents.view",
   },
   {
     path: "/relatorios",
     label: "Relatórios",
-    icon: ChartNoAxesCombined,
+    icon: AnalyticsIcon,
     permission: "reports.view",
   },
   {
     path: "/painel-tv",
     label: "Painel de TV",
-    icon: Monitor,
+    icon: TvDisplayIcon,
     permission: "tv.view",
   },
   {
     path: "/configuracoes",
     label: "Configurações",
-    icon: Settings2,
+    icon: OfficeSettingsIcon,
     permission: "settings.view",
   },
   {
     path: "/usuarios",
     label: "Usuários e permissões",
-    icon: UsersRound,
+    icon: UserAccessIcon,
     permission: "users.manage",
   },
 ];
+function canAny(actor: Actor, permission: Permission | Permission[]) {
+  return (Array.isArray(permission) ? permission : [permission]).some((item) =>
+    hasPermission(actor, item),
+  );
+}
+// Old /modelos links keep working inside the unified "Fluxos e processos".
+function LegacyTemplatesRedirect() {
+  const { search } = useLocation();
+  const params = new URLSearchParams(search);
+  const target = new URLSearchParams({
+    aba: params.get("aba") === "implantacao" ? "fluxos" : "modelos",
+  });
+  const company = params.get("empresa");
+  if (company) target.set("empresa", company);
+  return <Navigate to={`/processos?${target.toString()}`} replace />;
+}
 function PermissionRoute({
   permission,
   children,
 }: {
-  permission: Permission;
+  permission: Permission | Permission[];
   children: ReactNode;
 }) {
   const { actor } = usePortal();
-  return hasPermission(actor, permission) ? (
+  return canAny(actor, permission) ? (
     children
   ) : (
     <EmptyState
@@ -119,29 +153,70 @@ function PermissionRoute({
   );
 }
 function Shell() {
+  const { group, clearGroup } = useOrganization();
   const location = useLocation();
-  const {
-    actor,
-    data,
-    department,
-    setDepartment,
-    competence,
-    logout,
-    localTest,
-  } = usePortal();
+  const { actor, data, department, setDepartment, logout, localTest } =
+    usePortal();
   const [account, setAccount] = useState(false);
   const [notifications, setNotifications] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
-  const allowed = navigation.filter((item) =>
-    hasPermission(actor, item.permission),
-  );
-  const landing = hasPermission(actor, "users.manage")
-    ? "/usuarios"
+  const [compact, setCompact] = useState(() => {
+    try {
+      return localStorage.getItem("apice.sidebar.compact") === "1";
+    } catch {
+      return false;
+    }
+  });
+  // Department selector in the top bar can be collapsed to a small chip (17/10/2026).
+  const [departmentCollapsed, setDepartmentCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("apice.topbar.department") === "collapsed";
+    } catch {
+      return false;
+    }
+  });
+  function toggleDepartment() {
+    setDepartmentCollapsed((current) => {
+      try {
+        localStorage.setItem(
+          "apice.topbar.department",
+          current ? "open" : "collapsed",
+        );
+      } catch {
+        /* Visual preference is optional. */
+      }
+      return !current;
+    });
+  }
+  function toggleCompact() {
+    setCompact((current) => {
+      try {
+        localStorage.setItem("apice.sidebar.compact", current ? "0" : "1");
+      } catch {
+        /* Visual preference is optional. */
+      }
+      return !current;
+    });
+  }
+  const allowed = navigation.filter((item) => canAny(actor, item.permission));
+  const preferred =
+    actor.homeView === "executive"
+      ? "/relatorios"
+      : actor.homeView === "personal"
+        ? "/tarefas"
+        : "/visao-geral";
+  const landing = allowed.some((item) => item.path === preferred)
+    ? preferred
     : (allowed[0]?.path ?? "/sem-acesso");
-  const tasks = data.tasks.filter(
-    (t) => t.department === department && t.competence === competence,
-  );
-  const m = metric(tasks, data.now.slice(0, 10));
+  const showDepartment = ![
+    "/empresas",
+    "/usuarios",
+    "/configuracoes",
+    "/processos",
+    "/gestor",
+  ].includes(location.pathname);
+  const departmentName = (id: string) =>
+    data.workspace.departments.find((item) => item.id === id)?.name ?? id;
   if (location.pathname === "/painel-tv/exibir")
     return (
       <Suspense
@@ -153,7 +228,9 @@ function Shell() {
       </Suspense>
     );
   return (
-    <div className="app-shell">
+    <div
+      className={`app-shell ${compact ? "sidebar-compact" : ""} ${departmentCollapsed ? "topbar-collapsed" : ""}`}
+    >
       <a
         className="skip-link"
         href="#main"
@@ -175,41 +252,59 @@ function Shell() {
         <div className="brand">
           <span>Portal interno</span>
           <button
+            className="icon-button sidebar-toggle"
+            aria-label={
+              compact ? "Expandir menu lateral" : "Recolher menu lateral"
+            }
+            title={compact ? "Expandir menu" : "Recolher menu"}
+            onClick={toggleCompact}
+          >
+            {compact ? (
+              <SidebarExpandIcon size={18} />
+            ) : (
+              <SidebarCollapseIcon size={18} />
+            )}
+          </button>
+          <button
             className="mobile-only icon-button"
             aria-label="Fechar menu"
             onClick={() => setMobileNav(false)}
           >
-            <X size={18} />
+            <CloseIcon size={18} />
           </button>
         </div>
-        <div className="workspace">
-          <span>
-            <strong>Ápice Contábil</strong>
-            <small>Portal do colaborador</small>
-          </span>
+        <div className="workspace sidebar-branding">
+          {/* Each group's own logo, white over the blue panel like the login. */}
+          {group ? (
+            <img
+              className={`sidebar-logo sidebar-logo-${group.id}`}
+              src={group.logo.src}
+              width={group.logo.width}
+              height={group.logo.height}
+              alt={group.name}
+            />
+          ) : (
+            <span>
+              <strong>Ápice</strong>
+              <small>Portal do colaborador</small>
+            </span>
+          )}
         </div>
         <span className="nav-label">OPERAÇÃO</span>
-        <nav aria-label="Navegação principal">
-          {allowed.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              onClick={() => setMobileNav(false)}
-              className={({ isActive }) =>
-                `nav-item ${isActive ? "active" : ""}`
-              }
-            >
-              <item.icon size={19} />
-              {item.path === "/tarefas" &&
+        <NavigationMenu
+          key={`${actor.tenantId}:${actor.userId}`}
+          items={allowed.map((item) => ({
+            ...item,
+            label:
+              item.path === "/tarefas" &&
               hasPermission(actor, "tasks.team.view")
                 ? "Tarefas da equipe"
-                : item.label}
-              {item.path === "/tarefas" && (
-                <span className="nav-count">{m.open}</span>
-              )}
-            </NavLink>
-          ))}
-        </nav>
+                : item.label,
+          }))}
+          preferenceKey={`apice.menu.order:${actor.tenantId}:${actor.userId}`}
+          compact={compact}
+          onNavigate={() => setMobileNav(false)}
+        />
         <div className="sidebar-bottom">
           {localTest && <span className="nav-label">AMBIENTE DE TESTES</span>}
           <button
@@ -221,14 +316,20 @@ function Shell() {
             <span>
               <strong>{actor.name}</strong>
               <small>
-                {roleLabels[actor.role]} · {department}
+                {departmentPositionLabel(data.workspace, actor, department)} ·{" "}
+                {departmentName(department)}
               </small>
             </span>
-            <ChevronDown size={15} />
+            <ChevronDownIcon size={15} />
           </button>
-          <button className="nav-item" onClick={logout}>
-            <LogOut size={19} />
-            Sair
+          <button
+            className="nav-item"
+            onClick={logout}
+            title={compact ? "Sair" : undefined}
+            aria-label="Sair"
+          >
+            <SignOutIcon size={19} />
+            <span className="nav-item-label">Sair</span>
           </button>
         </div>
       </aside>
@@ -240,27 +341,50 @@ function Shell() {
               aria-label="Abrir navegação"
               onClick={() => setMobileNav(!mobileNav)}
             >
-              <Menu size={19} />
+              <MenuIcon size={19} />
             </button>
-            <span className="department-label">Departamento</span>
-            <SelectField
-              aria-label="Departamento"
-              className="department-select"
-              value={department}
-              onValueChange={(value) => setDepartment(value as Department)}
-              options={actor.departments.map((value) => ({
-                value,
-                label: value,
-              }))}
-            />
+            {/* With a single department there is nothing to choose, so the selector stays hidden. */}
+            {showDepartment ? (
+              actor.departments.length > 1 && (
+                <>
+                  <span className="department-label">Departamento</span>
+                  <SelectField
+                    aria-label="Departamento"
+                    className="department-select"
+                    value={department}
+                    onValueChange={(value) =>
+                      setDepartment(value as Department)
+                    }
+                    options={actor.departments.map((value) => ({
+                      value,
+                      label: departmentName(value),
+                    }))}
+                  />
+                </>
+              )
+            ) : (
+              <strong>
+                {navigation.find((item) => item.path === location.pathname)
+                  ?.label ?? group?.name}
+              </strong>
+            )}
           </div>
           <div className="topbar-actions">
+            <button
+              type="button"
+              className="icon-button topbar-collapse"
+              onClick={toggleDepartment}
+              aria-label="Recolher a barra do topo"
+              title="Recolher a barra"
+            >
+              <ChevronUpIcon size={16} aria-hidden="true" />
+            </button>
             <button
               className="icon-button notification-button"
               aria-label="Abrir notificações"
               onClick={() => setNotifications(true)}
             >
-              <Bell size={19} />
+              <NotificationIcon size={19} />
             </button>
             <button
               className="avatar avatar-small topbar-profile"
@@ -271,6 +395,17 @@ function Shell() {
             </button>
           </div>
         </header>
+        {departmentCollapsed && (
+          <button
+            type="button"
+            className="topbar-handle"
+            onClick={toggleDepartment}
+            aria-label="Mostrar a barra do topo"
+            title="Mostrar a barra"
+          >
+            <ChevronDownIcon size={16} aria-hidden="true" />
+          </button>
+        )}
         <main id="main" className="page" tabIndex={-1}>
           <Suspense
             fallback={
@@ -310,11 +445,24 @@ function Shell() {
                   </PermissionRoute>
                 }
               />
+              <Route path="/modelos" element={<LegacyTemplatesRedirect />} />
               <Route
-                path="/modelos"
+                path="/processos"
                 element={
-                  <PermissionRoute permission="templates.view">
-                    <Templates />
+                  <PermissionRoute
+                    permission={["processes.view", "templates.view"]}
+                  >
+                    <Processes />
+                  </PermissionRoute>
+                }
+              />
+              <Route
+                path="/gestor"
+                element={
+                  <PermissionRoute
+                    permission={["tasks.team.view", "changes.manage"]}
+                  >
+                    <Manager />
                   </PermissionRoute>
                 }
               />
@@ -371,6 +519,9 @@ function Shell() {
             </Routes>
           </Suspense>
         </main>
+        {/* TEMPORARY client-demo tour: docs/TUTORIAL-DEMO-TEMPORARIO.md */}
+        <DemoTour />
+        <PreviewBlockedNotice />
       </div>
       <Modal
         open={account}
@@ -382,11 +533,21 @@ function Shell() {
           <strong>{actor.name}</strong>
         </p>
         <p>
-          {roleLabels[actor.role]} · {actor.departments.join(", ")}
+          {roleLabels[actor.role]} ·{" "}
+          {actor.departments.map(departmentName).join(", ")}
         </p>
         <button className="button button-secondary" onClick={logout}>
-          <LogOut size={16} />
+          <SignOutIcon size={16} />
           Sair do sistema
+        </button>
+        <button
+          className="button button-white"
+          onClick={() => {
+            logout();
+            clearGroup();
+          }}
+        >
+          Trocar grupo Ápice
         </button>
       </Modal>
       <Modal
@@ -402,7 +563,7 @@ function Shell() {
                 <strong>{event.action}</strong>
                 <p>{event.detail}</p>
                 <small>
-                  {event.actorName} · {event.at.slice(11, 16)}
+                  {event.actorName} · {businessTime(event.at)}
                 </small>
               </div>
             ))}
@@ -419,6 +580,7 @@ function Shell() {
 }
 export default function App() {
   const location = useLocation();
+  const { group } = useOrganization();
   if (location.pathname === "/tv")
     return (
       <Suspense
@@ -428,7 +590,7 @@ export default function App() {
       </Suspense>
     );
   return (
-    <PortalProvider>
+    <PortalProvider key={group?.id ?? "choose"}>
       <Shell />
     </PortalProvider>
   );

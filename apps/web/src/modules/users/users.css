@@ -5,6 +5,112 @@
   color: var(--muted);
   font-size: 0.8125rem;
 }
+.account-tabs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.account-tabs button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: white;
+  color: var(--ink);
+  font-size: 0.8125rem;
+}
+.account-tabs button.active {
+  border-color: #0e7f87;
+  background: #eef9fb;
+  color: #0e7f87;
+}
+.account-tabs button span {
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: #f2f5f6;
+  font-size: 0.7rem;
+}
+.account-copy-box {
+  border: 1px solid #cbeaf0;
+  background: #f4fbfc;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 24px;
+  display: grid;
+  gap: 12px;
+}
+.account-copy-box > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #0e7f87;
+  font-size: 0.8125rem;
+}
+.account-copy-preview p {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.account-copy-preview .button {
+  font-size: 0.75rem;
+}
+.account-access-fields {
+  margin-top: 20px;
+  margin-bottom: 16px;
+}
+.account-profile-intro {
+  color: var(--muted);
+  margin-bottom: 20px;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+.account-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 18px;
+}
+.account-profile-card {
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+.account-profile-card > svg {
+  color: #0e7f87;
+}
+.account-profile-card h2 {
+  font-size: 1rem;
+  margin: 0;
+}
+.account-profile-card p,
+.account-profile-card small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.account-profile-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.account-profile-card footer {
+  margin-top: auto;
+  padding-top: 12px;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.account-home-label {
+  display: block;
+  color: var(--muted);
+  font-size: 0.6875rem;
+  margin-top: 6px;
+}
 .account-name {
   display: flex;
   align-items: center;
@@ -130,7 +236,7 @@
 .account-checkbox input:checked {
   border-color: #0e7f87;
   background-color: #0e7f87;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m5 10 3 3 7-7' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-image: url("../../shared/icons/check.svg");
   background-position: center;
   background-size: 18px;
 }
@@ -206,5 +312,165 @@ fieldset:disabled .account-checkbox {
   }
   .account-list-total {
     display: none;
+  }
+}
+
+/* Client portal registration (demonstration only, fictitious data). */
+.client-portal-intro {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, #16afc4 6%, white);
+}
+.client-portal-intro strong {
+  display: block;
+  font-size: 0.9375rem;
+  color: var(--ink);
+}
+.client-portal-intro p {
+  margin-top: 4px;
+  max-width: 64ch;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.client-portal-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: white;
+  color: var(--teal);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.client-portal-demo {
+  margin-left: auto;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.client-access-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.client-access-tags > span {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--soft);
+  color: var(--teal);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+.client-portal-note {
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-size: 0.8125rem;
+}
+.client-access-fieldset {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0 0;
+  padding: 0;
+  border: 0;
+}
+.client-access-fieldset legend {
+  margin-bottom: 10px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+@media (max-width: 640px) {
+  .client-portal-intro {
+    flex-wrap: wrap;
+  }
+  .client-portal-demo {
+    margin-left: 52px;
+  }
+}
+.client-optional {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--muted);
+  font-size: 0.6875rem;
+  font-style: normal;
+  font-weight: 600;
+}
+.client-portal .table-toolbar > .button {
+  align-self: flex-end;
+}
+
+/* Phones and tablets: each account becomes a bordered stacked block, nothing cut (17/10/2026). */
+@media (max-width: 900px) {
+  .account-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .account-tabs > button {
+    min-width: 0;
+    justify-content: center;
+    white-space: normal;
+    text-align: center;
+  }
+  .account-table,
+  .account-table tbody {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+  .account-table thead {
+    display: none;
+  }
+  .account-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 10px 14px;
+    margin: 0 0 12px;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: white;
+  }
+  .account-table td {
+    display: block;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    overflow-wrap: anywhere;
+  }
+  .account-table td:first-child {
+    grid-column: 1 / -1;
+  }
+  .account-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 3px;
+    color: var(--muted);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+  .account-table td.account-actions-cell {
+    grid-column: 1 / -1;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
+    text-align: center;
+  }
+  .account-table .account-department-list {
+    white-space: normal;
   }
 }

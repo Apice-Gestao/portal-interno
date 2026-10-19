@@ -1,20 +1,26 @@
 import { downloadText } from "../../shared/downloads";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
-  ChevronLeft,
-  ChevronRight,
-  CircleAlert,
-  Clock3,
-  ListTodo,
-  Plus,
-  Search,
-  SlidersHorizontal,
-  Download,
-  X,
-} from "lucide-react";
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  OverdueIcon,
+  ClockIcon,
+  TaskChecklistIcon,
+  AddIcon,
+  SearchIcon,
+  FilterIcon,
+  DownloadIcon,
+  CloseIcon,
+  BoardIcon,
+  ListViewIcon,
+  CalendarIcon,
+} from "../../shared/icons";
 import {
   csvCell,
+  businessDate,
+  closedCompetence,
+  competenceLabel,
   dateLabel,
   deadline,
   hasPermission,
@@ -37,6 +43,11 @@ import {
 } from "../../shared/ui/TaskStatus";
 import { SelectField } from "../../shared/ui/SelectField";
 import { FilterMenu } from "../../shared/ui/FilterMenu";
+import "./task-views.css";
+import { BulkImport, BulkTaskTransfer } from "../../shared/ui/BulkOperations";
+// Clicking anywhere on the row opens it; controls inside keep their own action.
+const fromControl = (event: { target: EventTarget }) =>
+  !!(event.target as HTMLElement).closest?.("button, a, input, label, select");
 export default function TasksPage() {
   const {
     data,
@@ -44,16 +55,74 @@ export default function TasksPage() {
     department,
     competence,
     setCompetence,
+    setDepartment,
     notify,
     updating,
   } = usePortal();
   const [params, setParams] = useSearchParams();
   const [create, setCreate] = useState(false);
   const [advanced, setAdvanced] = useState(false);
+  const [presentation, setPresentation] = useState<"list" | "board">("list");
+  const routeDepartment = params.get("department");
+  const routeCompetence = params.get("competence");
+  const dueDate = params.get("dueDate") ?? "";
+  const dueMode = params.get("dueMode") ?? "both";
+  const calendarMonth = params.get("calendarMonth") ?? "";
+  useEffect(() => {
+    const next = new URLSearchParams(params);
+    let changed = false;
+    if (routeCompetence && /^\d{4}-(0[1-9]|1[0-2])$/.test(routeCompetence)) {
+      setCompetence(routeCompetence);
+      next.delete("competence");
+      changed = true;
+    }
+    if (
+      routeDepartment &&
+      routeDepartment !== "all" &&
+      actor.departments.includes(routeDepartment)
+    ) {
+      setDepartment(routeDepartment);
+      next.delete("department");
+      changed = true;
+    }
+    if (changed) setParams(next, { replace: true });
+  }, [
+    routeCompetence,
+    routeDepartment,
+    params,
+    setCompetence,
+    setDepartment,
+    setParams,
+    actor.departments,
+  ]);
+  const selectedDepartment =
+    routeDepartment === "all"
+      ? "all"
+      : routeDepartment && actor.departments.includes(routeDepartment)
+        ? routeDepartment
+        : department;
+  const selectedCompetence =
+    routeCompetence && /^\d{4}-(0[1-9]|1[0-2])$/.test(routeCompetence)
+      ? routeCompetence
+      : competence;
+  const calendarFilter =
+    /^\d{4}-(0[1-9]|1[0-2])$/.test(calendarMonth) ||
+    /^\d{4}-\d{2}-\d{2}$/.test(dueDate);
   const tasks = data.tasks.filter(
-    (t) => t.department === department && t.competence === competence,
+    (t) =>
+      (selectedDepartment === "all" || t.department === selectedDepartment) &&
+      (calendarFilter
+        ? (dueMode !== "legal" &&
+            (dueDate
+              ? t.internalDue === dueDate
+              : t.internalDue.startsWith(calendarMonth))) ||
+          (dueMode !== "meta" &&
+            (dueDate
+              ? t.legalDue === dueDate
+              : t.legalDue.startsWith(calendarMonth)))
+        : t.competence === selectedCompetence),
   );
-  const today = data.now.slice(0, 10);
+  const today = businessDate(data.now);
   const m = metric(tasks, today);
   const status = params.get("status") ?? "all";
   const search = params.get("q") ?? "";
@@ -77,7 +146,7 @@ export default function TasksPage() {
     else {
       next.set("urgency", "legal");
       // Closed deliveries cannot be legally overdue. Preserve the other refinements.
-      if (["done", "dispensed", "closed"].includes(status))
+      if (["done", "dispensed", "closed", "cancelled"].includes(status))
         next.delete("status");
     }
     next.delete("page");
@@ -92,6 +161,13 @@ export default function TasksPage() {
   const filtered = tasks
     .filter(
       (t) =>
+        (!params.get("regime") ||
+          data.companies.find((company) => company.id === t.companyId)
+            ?.regime === params.get("regime")) &&
+        (!params.get("group") ||
+          data.companies
+            .find((company) => company.id === t.companyId)
+            ?.tags?.includes(params.get("group")!)) &&
         matchesSelection(
           t,
           { status, obligation, owner, urgency, company: companyFilter, model },
@@ -121,7 +197,7 @@ export default function TasksPage() {
           t.title,
           t.internalDue,
           t.legalDue,
-          statusLabels[t.status],
+          t.cancelled ? "Cancelada" : statusLabels[t.status],
         ]),
       ]
         .map((row) => row.map(csvCell).join(";"))
@@ -130,7 +206,7 @@ export default function TasksPage() {
     notify("Exportação preparada com os filtros atuais.");
   }
   const tabs: { value: TaskStatus | "all"; label: string; count: number }[] = [
-    { value: "all", label: "Todas as tarefas", count: tasks.length },
+    { value: "all", label: "Todas as tarefas", count: m.total },
     {
       value: "todo",
       label: "A fazer",
@@ -153,28 +229,55 @@ export default function TasksPage() {
             : "Minhas tarefas"
         }
       >
-        <CompetenceSelect />
+        {!calendarFilter && <CompetenceSelect />}
+        {hasPermission(actor, "tasks.create") && <BulkImport kind="tasks" />}
+        {hasPermission(actor, "tasks.assign") && <BulkTaskTransfer />}
         {hasPermission(actor, "tasks.create") && (
           <button
             className="button button-primary"
             onClick={() => setCreate(true)}
           >
-            <Plus size={17} />
+            <AddIcon size={17} />
             Nova tarefa
           </button>
         )}
       </PageHeading>
+      {(calendarFilter || selectedDepartment === "all") && (
+        <div className="task-filter-context">
+          <CalendarIcon size={16} />
+          <span>
+            {calendarFilter
+              ? `Vencimentos ${dueDate ? `de ${dateLabel(dueDate)}` : `do mês ${calendarMonth}`} · ${dueMode === "meta" ? "Meta interna" : dueMode === "legal" ? "Prazo legal" : "Meta e prazo legal"}`
+              : "Competência selecionada"}
+            {selectedDepartment === "all"
+              ? " · Todos os departamentos autorizados"
+              : ""}
+          </span>
+          <button
+            className="text-button"
+            onClick={() => {
+              const next = new URLSearchParams(params);
+              ["dueDate", "dueMode", "calendarMonth", "department"].forEach(
+                (key) => next.delete(key),
+              );
+              setParams(next);
+            }}
+          >
+            Voltar ao departamento <CloseIcon size={13} />
+          </button>
+        </div>
+      )}
       <div className="task-summary">
         <div className="summary-intro">
           <span className="summary-icon">
-            <ListTodo size={22} />
+            <TaskChecklistIcon size={22} />
           </span>
           <div>
-            <strong>{tasks.length} tarefas</strong>
+            <strong>{m.total} tarefas</strong>
             <p>
               {
                 data.companies.filter((c) =>
-                  tasks.some((t) => t.companyId === c.id),
+                  tasks.some((t) => !t.cancelled && t.companyId === c.id),
                 ).length
               }{" "}
               empresas
@@ -196,7 +299,7 @@ export default function TasksPage() {
           aria-pressed={urgency === "legal"}
           aria-label={`Filtrar ${m.legalLate} tarefas atrasadas`}
         >
-          <CircleAlert size={18} />
+          <OverdueIcon size={18} />
           <div>
             <strong>{m.legalLate}</strong>
             <span>Atrasadas</span>
@@ -209,10 +312,33 @@ export default function TasksPage() {
         options={tabs}
         onChange={(value) => filter("status", value)}
       />
+      <div
+        className="task-presentation"
+        role="group"
+        aria-label="Apresentação das tarefas"
+      >
+        <button
+          aria-pressed={presentation === "list"}
+          onClick={() => setPresentation("list")}
+          className={presentation === "list" ? "active" : ""}
+        >
+          <ListViewIcon size={16} />
+          Lista
+        </button>
+        <button
+          aria-pressed={presentation === "board"}
+          onClick={() => setPresentation("board")}
+          className={presentation === "board" ? "active" : ""}
+        >
+          <BoardIcon size={16} />
+          Quadro
+        </button>
+        <span>Clique na tarefa para executar ou acompanhar.</span>
+      </div>
       <section className="surface tasks-surface" aria-label="Lista de tarefas">
         <div className="table-toolbar">
           <label className="search-field">
-            <Search size={17} />
+            <SearchIcon size={17} />
             <input
               placeholder="Buscar empresa ou obrigação..."
               value={search}
@@ -251,16 +377,42 @@ export default function TasksPage() {
               onClick={() => setAdvanced(!advanced)}
               aria-expanded={advanced}
             >
-              <SlidersHorizontal size={16} />
+              <FilterIcon size={16} />
               Filtros
             </button>
+            <SelectField
+              aria-label="Regime das empresas"
+              value={params.get("regime") ?? ""}
+              onValueChange={(value) => filter("regime", value)}
+            >
+              <option value="">Todos os regimes</option>
+              {[
+                ...new Set(data.companies.map((company) => company.regime)),
+              ].map((regime) => (
+                <option key={regime}>{regime}</option>
+              ))}
+            </SelectField>
+            <SelectField
+              aria-label="Agrupador de clientes das tarefas"
+              value={params.get("group") ?? ""}
+              onValueChange={(value) => filter("group", value)}
+            >
+              <option value="">Todos os agrupadores</option>
+              {[
+                ...new Set(
+                  data.companies.flatMap((company) => company.tags ?? []),
+                ),
+              ].map((tag) => (
+                <option key={tag}>{tag}</option>
+              ))}
+            </SelectField>
             {hasPermission(actor, "tasks.export") && (
               <button
                 className="icon-button"
                 aria-label="Exportar tarefas em CSV"
                 onClick={exportTasks}
               >
-                <Download size={17} />
+                <DownloadIcon size={17} />
               </button>
             )}
           </div>
@@ -284,6 +436,7 @@ export default function TasksPage() {
                     {label}
                   </option>
                 ))}
+                <option value="cancelled">Canceladas</option>
               </SelectField>
             </label>
             {hasPermission(actor, "tasks.team.view") && (
@@ -307,107 +460,193 @@ export default function TasksPage() {
               className="text-button"
               onClick={() => setParams(selected ? { task: selected } : {})}
             >
-              <X size={14} />
+              <CloseIcon size={14} />
               Limpar filtros
             </button>
           </div>
         )}
         {filtered.length ? (
           <>
-            <div className="table-wrap">
-              <table className="data-table task-table">
-                <colgroup>
-                  <col className="task-company-column" />
-                  <col className="task-date-column" />
-                  <col className="task-date-column" />
-                  <col className="task-situation-column" />
-                  <col className="task-owner-column" />
-                </colgroup>
-                <thead>
-                  <tr>
-                    <th>Empresa / obrigação</th>
-                    <th>Meta interna</th>
-                    <th>Prazo legal</th>
-                    <th>Situação</th>
-                    <th>Responsável</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visible.map((t) => {
-                    const company = data.companies.find(
-                      (c) => c.id === t.companyId,
-                    );
-                    const d = deadline(t, today);
-                    const user = data.users.find(
-                      (u) => u.userId === t.assigneeId,
-                    );
-                    return (
-                      <tr key={t.id} className="task-row">
-                        <td>
+            {presentation === "board" ? (
+              <div className="task-board">
+                {[
+                  { id: "todo", label: "A fazer", statuses: ["todo"] },
+                  {
+                    id: "progress",
+                    label: "Em andamento",
+                    statuses: ["in_progress", "waiting", "returned"],
+                  },
+                  {
+                    id: "review",
+                    label: "Em conferência",
+                    statuses: ["in_review"],
+                  },
+                  {
+                    id: "closed",
+                    label: "Encerradas",
+                    statuses: ["done", "dispensed"],
+                  },
+                ].map((column) => (
+                  <section
+                    className={`task-board-column task-board-${column.id}`}
+                    key={column.id}
+                  >
+                    <h2>
+                      {column.label}
+                      <span>
+                        {
+                          filtered.filter((task) =>
+                            column.statuses.includes(task.status),
+                          ).length
+                        }
+                      </span>
+                    </h2>
+                    {visible
+                      .filter((task) => column.statuses.includes(task.status))
+                      .map((task) => {
+                        const company = data.companies.find(
+                          (item) => item.id === task.companyId,
+                        );
+                        const owner = data.users.find(
+                          (item) => item.userId === task.assigneeId,
+                        );
+                        return (
                           <button
-                            className="company-cell row-action"
-                            onClick={() => openTask(t.id)}
-                            aria-label={`Abrir ${t.title} de ${company?.name}`}
+                            key={task.id}
+                            className="task-board-card"
+                            onClick={() => openTask(task.id)}
                           >
-                            <span
-                              className={`company-monogram monogram-${Number(company?.code ?? 0) % 4}`}
-                            >
-                              {company?.name.slice(0, 2).toUpperCase()}
+                            <small>
+                              {company?.code} · {company?.name}
+                            </small>
+                            <strong>{task.title}</strong>
+                            <TaskDeadlineBadge task={task} today={today} />
+                            <span className="task-board-dates">
+                              Meta {dateLabel(task.internalDue)} · Legal{" "}
+                              {dateLabel(task.legalDue)}
                             </span>
-                            <span className="company-info">
-                              <strong>{company?.name ?? "Empresa"}</strong>
-                              <span>{t.title}</span>
+                            <span className="task-board-owner">
+                              <span className="avatar avatar-tiny">
+                                {owner?.initials ?? "EQ"}
+                              </span>
+                              {owner?.name ?? "Fila do departamento"}
                             </span>
                           </button>
-                        </td>
-                        <td>
-                          <time
-                            dateTime={t.internalDue}
-                            title={`${dateLabel(t.internalDue)}/${t.internalDue.slice(0, 4)}`}
-                            aria-label={`${dateLabel(t.internalDue)}/${t.internalDue.slice(0, 4)}`}
-                            className={`date-value ${d.internalLate && !["done", "dispensed"].includes(t.status) ? "date-warning" : ""}`}
-                          >
-                            {dateLabel(t.internalDue)}
-                          </time>
-                        </td>
-                        <td>
-                          <time
-                            dateTime={t.legalDue}
-                            title={`${dateLabel(t.legalDue)}/${t.legalDue.slice(0, 4)}`}
-                            aria-label={`${dateLabel(t.legalDue)}/${t.legalDue.slice(0, 4)}`}
-                            className={`date-value ${d.legalLate && !["done", "dispensed"].includes(t.status) ? "date-danger" : ""}`}
-                          >
-                            {dateLabel(t.legalDue)}
-                          </time>
-                        </td>
-                        <td>
-                          <div className="task-situation">
-                            <TaskDeadlineBadge task={t} today={today} />
-                            {!["done", "dispensed"].includes(t.status) && (
-                              <TaskWorkflowLabel status={t.status} />
-                            )}
-                            {t.dispenseRequested && (
-                              <span className="date-hint">
-                                Dispensa solicitada
+                        );
+                      })}
+                    {!visible.some((task) =>
+                      column.statuses.includes(task.status),
+                    ) && (
+                      <p className="task-board-empty">
+                        Nenhuma tarefa nesta página
+                      </p>
+                    )}
+                  </section>
+                ))}
+              </div>
+            ) : (
+              <div className="table-wrap">
+                <table className="data-table task-table">
+                  <colgroup>
+                    <col className="task-company-column" />
+                    <col className="task-date-column" />
+                    <col className="task-date-column" />
+                    <col className="task-situation-column" />
+                    <col className="task-owner-column" />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th>Empresa / obrigação</th>
+                      <th>Meta interna</th>
+                      <th>Prazo legal</th>
+                      <th>Situação</th>
+                      <th>Responsável</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visible.map((t) => {
+                      const company = data.companies.find(
+                        (c) => c.id === t.companyId,
+                      );
+                      const d = deadline(t, today);
+                      const user = data.users.find(
+                        (u) => u.userId === t.assigneeId,
+                      );
+                      return (
+                        <tr
+                          key={t.id}
+                          className="task-row row-clickable"
+                          onClick={(event) => {
+                            if (!fromControl(event)) openTask(t.id);
+                          }}
+                        >
+                          <td>
+                            <button
+                              className="company-cell row-action"
+                              onClick={() => openTask(t.id)}
+                              aria-label={`Abrir ${t.title} de ${company?.name}`}
+                            >
+                              <span
+                                className={`company-monogram monogram-${Number(company?.code ?? 0) % 4}`}
+                              >
+                                {company?.name.slice(0, 2).toUpperCase()}
                               </span>
-                            )}
-                          </div>
-                        </td>
-                        <td>
-                          <span className="owner-cell">
-                            <span className="avatar avatar-tiny">
-                              {user?.initials}
+                              <span className="company-info">
+                                <strong>{company?.name ?? "Empresa"}</strong>
+                                <span>{t.title}</span>
+                              </span>
+                            </button>
+                          </td>
+                          <td>
+                            <time
+                              dateTime={t.internalDue}
+                              title={`${dateLabel(t.internalDue)}/${t.internalDue.slice(0, 4)}`}
+                              aria-label={`${dateLabel(t.internalDue)}/${t.internalDue.slice(0, 4)}`}
+                              className={`date-value ${d.internalLate && !["done", "dispensed"].includes(t.status) ? "date-warning" : ""}`}
+                            >
+                              {dateLabel(t.internalDue)}
+                            </time>
+                          </td>
+                          <td>
+                            <time
+                              dateTime={t.legalDue}
+                              title={`${dateLabel(t.legalDue)}/${t.legalDue.slice(0, 4)}`}
+                              aria-label={`${dateLabel(t.legalDue)}/${t.legalDue.slice(0, 4)}`}
+                              className={`date-value ${d.legalLate && !["done", "dispensed"].includes(t.status) ? "date-danger" : ""}`}
+                            >
+                              {dateLabel(t.legalDue)}
+                            </time>
+                          </td>
+                          <td>
+                            <div className="task-situation">
+                              <TaskDeadlineBadge task={t} today={today} />
+                              {!["done", "dispensed"].includes(t.status) && (
+                                <TaskWorkflowLabel status={t.status} />
+                              )}
+                              {t.dispenseRequested && (
+                                <span className="date-hint">
+                                  Dispensa solicitada
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td>
+                            <span className="owner-cell">
+                              <span className="avatar avatar-tiny">
+                                {user?.initials ?? "EQ"}
+                              </span>
+                              {user
+                                ? `${user.name.split(" ")[0]} ${user.name.split(" ").at(-1)}`
+                                : "Fila do departamento"}
                             </span>
-                            {user?.name.split(" ")[0]}{" "}
-                            {user?.name.split(" ").at(-1)}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
             <footer className="table-footer">
               <span>
                 {(current - 1) * 8 + 1}–{Math.min(current * 8, filtered.length)}{" "}
@@ -423,7 +662,7 @@ export default function TasksPage() {
                     setParams(next);
                   }}
                 >
-                  <ChevronLeft size={15} />
+                  <ChevronLeftIcon size={15} />
                 </button>
                 <span>
                   {current} / {pageCount}
@@ -437,11 +676,11 @@ export default function TasksPage() {
                     setParams(next);
                   }}
                 >
-                  <ChevronRight size={15} />
+                  <ChevronRightIcon size={15} />
                 </button>
               </div>
               <span>
-                <Clock3 size={14} />
+                <ClockIcon size={14} />
                 {updating ? "Atualizando…" : "Atualizado agora"}
               </span>
             </footer>
@@ -454,11 +693,11 @@ export default function TasksPage() {
               <button
                 className="button button-white"
                 onClick={() => {
-                  setCompetence("2026-09");
+                  setCompetence(closedCompetence(data.now));
                   setParams({});
                 }}
               >
-                Ver setembro
+                Ver competência {competenceLabel(closedCompetence(data.now))}
               </button>
             }
           />

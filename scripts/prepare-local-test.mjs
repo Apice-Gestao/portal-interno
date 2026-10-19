@@ -5,7 +5,7 @@ import { createSeed, OPERATOR_PERMISSIONS, PERMISSIONS } from "@apice/domain";
 import { seedDatabase } from "../apps/api/dist/database/postgres-store.js";
 import { hashPassword } from "../apps/api/dist/security/password.js";
 import {
-  LOCAL_TEST_TENANT,
+  LOCAL_TEST_GROUPS,
   localTestLoginEnabled,
 } from "../apps/api/dist/security/local-test-login.js";
 
@@ -23,9 +23,12 @@ if (
   throw new Error(
     "Dados de teste exigem a instância PostgreSQL local exclusiva.",
   );
+const pool = new pg.Pool({ connectionString: owner.href, max: 1 });
+try {
+for (const [groupId, tenantId] of Object.entries(LOCAL_TEST_GROUPS)) {
 const state = createSeed();
 for (const records of Object.values(state))
-  for (const record of records) record.tenantId = LOCAL_TEST_TENANT;
+  for (const record of records) record.tenantId = tenantId;
 for (const actor of state.users) {
   actor.active = true;
   actor.permissions =
@@ -48,12 +51,10 @@ for (const actor of state.users) {
           : ["tasks.view", "tasks.team.view", "tasks.download"];
 }
 const encoded = await hashPassword(randomBytes(48).toString("base64url"));
-const pool = new pg.Pool({ connectionString: owner.href, max: 1 });
-try {
   await seedDatabase(pool, state, new Map(), {
-    tenantNames: new Map([[LOCAL_TEST_TENANT, "Ápice · testes locais"]]),
+    tenantNames: new Map([[tenantId, `Ápice ${groupId} · testes locais`]]),
     credentials: state.users.map((actor) => ({
-      tenant_id: LOCAL_TEST_TENANT,
+      tenant_id: tenantId,
       user_id: actor.userId,
       login: `local-test-${actor.userId}`,
       email: null,
@@ -65,6 +66,7 @@ try {
       updated_at: new Date().toISOString(),
     })),
   });
+}
   console.log(
     "Ambiente fictício de testes preparado; dados existentes preservados.",
   );

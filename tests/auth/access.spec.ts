@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import path from "node:path";
 import type { AccountUser, Actor, Snapshot, Task } from "@apice/domain";
 
 // Credenciais sintéticas usadas somente no banco temporário criado pelo harness.
@@ -13,8 +15,45 @@ const OPERATOR_NAME = "Operador de teste";
 const SUPERVISOR_NAME = "Supervisor de teste";
 type Session = { token: string; actor: Actor; mustChangePassword: boolean };
 
+// Codes of the e-mail second factor land in the harness' private mailbox.
+function mailbox() {
+  const control = JSON.parse(
+    readFileSync(path.resolve(".local/auth-test-control.json"), "utf8"),
+  ) as { mailDirectory: string };
+  const directory = path.resolve(control.mailDirectory);
+  return existsSync(directory) ? directory : undefined;
+}
+function mailFiles() {
+  const directory = mailbox();
+  return directory ? readdirSync(directory) : [];
+}
+async function codeFor(email: string, before: Set<string>) {
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const directory = mailbox();
+    for (const file of mailFiles().filter((name) => !before.has(name))) {
+      const message = JSON.parse(
+        readFileSync(path.join(directory!, file), "utf8"),
+      ) as { to?: string; code?: string };
+      if (message.to === email && message.code) return message.code;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  throw new Error("Código de verificação não chegou à caixa local de teste.");
+}
+
+// The portal opens on the group choice (ecosystem, 16–17/10/2026); the
+// synthetic accounts belong to the Contábil group, the first card.
+async function openPortal(page: Page, path = "/#/tarefas") {
+  await page.goto(path);
+  await page
+    .getByRole("button", { name: /Acessar ambiente/ })
+    .or(page.getByText("Acessar ambiente"))
+    .first()
+    .click();
+}
+
 async function login(page: Page, username: string, password: string) {
-  await page.goto("/#/tarefas");
+  await openPortal(page);
   await expect(
     page.getByRole("heading", { name: "Entrar", exact: true }),
   ).toBeVisible();
@@ -25,10 +64,56 @@ async function login(page: Page, username: string, password: string) {
       result.url().endsWith("/api/v1/login") &&
       result.request().method() === "POST",
   );
+  const before = new Set(mailFiles());
   await page.getByRole("button", { name: "Entrar", exact: true }).click();
   const result = await response;
   expect(result.status()).toBe(201);
-  return (await result.json()) as Session;
+  // Password alone never opens a session: the e-mail code comes next.
+  const challenge = (await result.json()) as { needsEmail?: boolean };
+  expect("token" in challenge).toBe(false);
+  const email = `${username}@exemplo.test`;
+  if (challenge.needsEmail) {
+    await expect(
+      page.getByRole("heading", { name: "Vincule seu e-mail" }),
+    ).toBeVisible();
+    await page.getByLabel("E-mail", { exact: true }).fill(email);
+    await page.getByRole("button", { name: /Enviar código/ }).click();
+  }
+  await expect(
+    page.getByRole("heading", { name: "Confirme seu acesso" }),
+  ).toBeVisible();
+  const verified = page.waitForResponse(
+    (item) =>
+      item.url().endsWith("/api/v1/login/verify") &&
+      item.request().method() === "POST",
+  );
+  await page
+    .getByLabel("Código de verificação", { exact: true })
+    .fill(await codeFor(email, before));
+  await page.getByRole("button", { name: /Verificar e continuar/ }).click();
+  const session = await verified;
+  expect(session.status()).toBe(201);
+  return (await session.json()) as Session;
+}
+
+// Competence is chosen on the tear-off calendar (17/10/2026), not typed.
+async function selectCompetence(page: Page, month: string) {
+  await page.getByRole("button", { name: "Competência", exact: true }).click();
+  const target = `${month.slice(5)}/${month.slice(0, 4)}`;
+  for (let step = 0; step < 36; step++) {
+    const use = page.getByRole("button", { name: /^Usar \d{2}\/\d{4}$/ });
+    const label = (await use.textContent())?.trim() ?? "";
+    const shown = label.slice(-7);
+    if (shown === target) {
+      await use.click();
+      return;
+    }
+    const later = `${shown.slice(3)}-${shown.slice(0, 2)}` < month;
+    await page
+      .getByRole("button", { name: later ? "Próximo mês" : "Mês anterior", exact: true })
+      .click();
+  }
+  throw new Error(`Competência ${target} não encontrada na folhinha.`);
 }
 
 async function changePassword(page: Page, current: string, next: string) {
@@ -62,10 +147,18 @@ async function createAccount(
     exact: true,
   });
   await dialog.getByLabel("Nome completo", { exact: true }).fill(name);
-  await dialog.getByLabel("Usuário de acesso", { exact: true }).fill(username);
   await dialog
-    .getByLabel("Tipo de usuário", { exact: true })
-    .selectOption(role);
+    .getByLabel("E-mail", { exact: true })
+    .fill(`${username}@exemplo.test`);
+  await dialog.getByLabel("Usuário de acesso", { exact: true }).fill(username);
+  // Radix select: open it and pick the visible option.
+  await dialog.getByRole("combobox", { name: "Tipo de usuário" }).click();
+  await page
+    .getByRole("option", {
+      name: role === "operator" ? "Operador" : "Supervisor",
+      exact: true,
+    })
+    .click();
   await dialog.getByLabel("Senha temporária", { exact: true }).fill(password);
   await dialog.getByRole("checkbox", { name: "Fiscal", exact: true }).check();
   await dialog
@@ -117,7 +210,7 @@ async function createAccount(
 test("sem sessão o portal exige login e não exibe ações internas; erro de senha é genérico", async ({
   page,
 }) => {
-  await page.goto("/#/tarefas");
+  await openPortal(page);
   await expect(
     page.getByRole("heading", { name: "Entrar", exact: true }),
   ).toBeVisible();
@@ -345,7 +438,7 @@ test("administrador configura abas e ações; operador executa apenas suas taref
       operatorPage.getByRole("heading", { level: 1, name: /^Configurações/ }),
     ).toHaveCount(0);
     await operatorPage.goto("/#/tarefas");
-    await operatorPage.getByLabel("Competência", { exact: true }).fill(month);
+    await selectCompetence(operatorPage, month);
     await operatorPage
       .getByRole("button", { name: new RegExp(`^Abrir ${task.title}`) })
       .click();
@@ -423,7 +516,7 @@ test("administrador configura abas e ações; operador executa apenas suas taref
             .then((s) => s.actor.permissions.includes("tasks.execute")),
       )
       .toBe(false);
-    await operatorPage.getByLabel("Competência", { exact: true }).fill(month);
+    await selectCompetence(operatorPage, month);
     await operatorPage
       .getByRole("button", { name: new RegExp(`^Abrir ${task.title}`) })
       .click();
@@ -534,7 +627,12 @@ test("administrador configura abas e ações; operador executa apenas suas taref
         })
       ).status(),
     ).toBe(401);
+    // A reload starts on the group choice; the revoked session is gone.
     await operatorPage.reload();
+    await operatorPage
+      .getByRole("button", { name: /Acessar ambiente/ })
+      .first()
+      .click();
     await expect(
       operatorPage.getByRole("heading", { name: "Entrar", exact: true }),
     ).toBeVisible();

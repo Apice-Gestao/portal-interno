@@ -1,15 +1,18 @@
 import {
-  Circle,
-  CircleAlert,
-  CircleCheck,
-  Clock3,
-  Hourglass,
-  MinusCircle,
-  Play,
-  RotateCcw,
-  ShieldCheck,
-  TriangleAlert,
-} from "lucide-react";
+  PendingIcon,
+  OverdueIcon,
+  CompletedIcon,
+  ClockIcon,
+  WaitingIcon,
+  DispensedIcon,
+  StartIcon,
+  ReturnedIcon,
+  ReviewIcon,
+  DeadlineWarningIcon,
+  OnTimeIcon,
+  TodayIcon,
+  CancelledIcon,
+} from "../icons";
 import { deadline, statusLabels } from "@apice/domain";
 import type { Task, TaskStatus } from "@apice/domain";
 import "./tasks-status.css";
@@ -22,7 +25,7 @@ function taskDeadlinePresentation(task: Task, today: string) {
   if (task.status === "dispensed")
     return {
       tone: "neutral" as DeadlineTone,
-      label: "Dispensada",
+      label: task.cancelled ? "Cancelada" : "Dispensada",
       late: false,
     };
   if (task.status === "done")
@@ -48,11 +51,11 @@ function taskDeadlinePresentation(task: Task, today: string) {
 }
 
 const deadlineIcons = {
-  neutral: Circle,
-  today: Clock3,
-  warning: TriangleAlert,
-  danger: CircleAlert,
-  success: CircleCheck,
+  neutral: OnTimeIcon,
+  today: TodayIcon,
+  warning: DeadlineWarningIcon,
+  danger: OverdueIcon,
+  success: CompletedIcon,
 };
 
 export function TaskDeadlineBadge({
@@ -63,25 +66,28 @@ export function TaskDeadlineBadge({
   today: string;
 }) {
   const state = taskDeadlinePresentation(task, today);
-  const Icon =
-    task.status === "dispensed" ? MinusCircle : deadlineIcons[state.tone];
+  const Icon = task.cancelled
+    ? CancelledIcon
+    : task.status === "dispensed"
+      ? DispensedIcon
+      : deadlineIcons[state.tone];
   return (
     <span className={`task-deadline task-deadline-${state.tone}`}>
       <Icon size={14} aria-hidden="true" />
       <span>{state.label}</span>
-      {state.late && <Clock3 size={13} aria-hidden="true" />}
+      {state.late && <ClockIcon size={13} aria-hidden="true" />}
     </span>
   );
 }
 
 const workflowIcons = {
-  todo: Circle,
-  in_progress: Play,
-  in_review: ShieldCheck,
-  returned: RotateCcw,
-  waiting: Hourglass,
-  done: CircleCheck,
-  dispensed: MinusCircle,
+  todo: PendingIcon,
+  in_progress: StartIcon,
+  in_review: ReviewIcon,
+  returned: ReturnedIcon,
+  waiting: WaitingIcon,
+  done: CompletedIcon,
+  dispensed: DispensedIcon,
 };
 
 export function TaskWorkflowLabel({ status }: { status: TaskStatus }) {

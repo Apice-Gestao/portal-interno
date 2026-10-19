@@ -39,6 +39,37 @@ describe("HTTP security and contracts", () => {
       ping.mockRestore();
     }
   });
+  it("logs an unexpected failure with its request id, never the cause to the person", async () => {
+    const lines: string[] = [];
+    const log = vi
+      .spyOn(console, "error")
+      .mockImplementation((line: unknown) => void lines.push(String(line)));
+    const snapshot = vi
+      .spyOn(app.get(PortalService).store, "snapshot")
+      .mockRejectedValueOnce(
+        new Error("Key (cnpj)=(12.345.678/0001-90) already exists"),
+      );
+    try {
+      const failed = await request(app.getHttpServer())
+        .get("/api/v1/snapshot?busca=Empresa%20Sigilosa")
+        .set("Authorization", `Bearer ${token}`)
+        .expect(500);
+      expect(failed.body.code).toBe("INTERNAL_ERROR");
+      const entry = JSON.parse(lines.find((line) => line.includes("request_failed"))!);
+      expect(entry).toMatchObject({
+        level: "error",
+        module: "snapshot",
+        route: "/api/v1/snapshot",
+        requestId: failed.headers["x-request-id"],
+      });
+      expect(lines.join(" ")).not.toContain("12.345.678");
+      expect(lines.join(" ")).not.toContain("Sigilosa");
+      expect(lines.join(" ")).not.toContain(token);
+    } finally {
+      snapshot.mockRestore();
+      log.mockRestore();
+    }
+  });
   it("returns 401 when a session is missing or forged", async () => {
     await request(app.getHttpServer()).get("/api/v1/snapshot").expect(401);
     await request(app.getHttpServer())

@@ -1,6 +1,6 @@
 # Auditoria do Portal Interno Ápice
 
-Data: 08/10/2026. Código de referência: commit `35e1d54`, versão `0.1.0`. Fonte: **PRD Portal Interno Apice.pdf**, versão 1.0 de 06/10/2026, 19 páginas e 52 seções. Projeto: `<pasta-do-projeto>`.
+Data: 08/10/2026. Código de referência: commit `35e1d54`, versão `0.1.0`. Fonte: **PRD Portal Interno Apice.pdf**, versão 1.0 de 06/10/2026, 19 páginas e 52 seções. Projeto: `<pasta do projeto>`.
 
 **Adendo de escopo:** após o levantamento, o usuário autorizou criar banco local migrável, usando PostgreSQL/Supabase como base, e ampliar massivamente os testes. Este documento preserva o diagnóstico do código de referência; implementações posteriores serão registradas em relatório de validação e no contexto, sem apagar os achados originais. A decisão de adiar o banco foi revogada pelo pedido posterior.
 

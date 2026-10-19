@@ -1,0 +1,14 @@
+.apice-icon {
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+  color: inherit;
+}
+.sidebar .nav-item > .apice-icon {
+  width: 21px;
+  height: 21px;
+}
+.ecosystem-icon > .apice-icon {
+  width: 31px;
+  height: 31px;
+}

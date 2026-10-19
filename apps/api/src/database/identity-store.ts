@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   ServiceUnavailableException,
@@ -31,6 +32,8 @@ export interface AccountInput {
   departments: Department[];
   permissions: Permission[];
   role: Role;
+  managerId?: string;
+  homeView?: "personal" | "team" | "management" | "executive";
 }
 export type AccountUpdate = Partial<AccountInput> & { active?: boolean };
 export interface Identity {
@@ -83,6 +86,10 @@ export abstract class IdentityStore {
   ): Promise<Identity>;
   abstract list(actor: Actor): Promise<AccountUser[]>;
   abstract create(actor: Actor, input: AccountInput): Promise<AccountUser>;
+  abstract createMany(
+    actor: Actor,
+    inputs: AccountInput[],
+  ): Promise<AccountUser[]>;
   abstract update(
     actor: Actor,
     userId: string,
@@ -91,6 +98,9 @@ export abstract class IdentityStore {
 }
 
 export class UnavailableIdentityStore extends IdentityStore {
+  createMany(): Promise<AccountUser[]> {
+    return this.unavailable();
+  }
   private unavailable(): never {
     throw new ServiceUnavailableException(
       "Login por senha exige o banco PostgreSQL configurado.",
@@ -189,6 +199,57 @@ export class PostgresIdentityStore
     )
       throw new ForbiddenException("Sem permissão para gerenciar usuários.");
     return current;
+  }
+  private async validateOrganization(
+    client: PoolClient,
+    user: Actor,
+    previousDepartments: string[] = [],
+  ) {
+    const catalog = await client.query<{
+      payload: { departments: { id: string; active: boolean }[] };
+    }>(
+      "SELECT payload FROM portal.workspace_settings WHERE tenant_id=$1 AND id='settings'",
+      [user.tenantId],
+    );
+    const departments =
+      catalog.rows[0]?.payload.departments ??
+      ["Fiscal", "Contábil", "Pessoal"].map((id) => ({ id, active: true }));
+    if (
+      user.departments.some(
+        (id) =>
+          !departments.some(
+            (entry) =>
+              entry.id === id &&
+              (entry.active || previousDepartments.includes(id)),
+          ),
+      )
+    )
+      throw new BadRequestException(
+        "Selecione departamentos cadastrados e ativos neste grupo.",
+      );
+    if (!user.managerId) return;
+    const team = await client.query<{ payload: Actor }>(
+      "SELECT payload FROM portal.users WHERE tenant_id=$1",
+      [user.tenantId],
+    );
+    const byId = new Map(
+      team.rows.map(({ payload }) => [payload.userId, payload]),
+    );
+    const leader = byId.get(user.managerId);
+    if (!leader || leader.active === false || leader.userId === user.userId)
+      throw new BadRequestException(
+        "Selecione uma liderança ativa deste grupo, diferente do próprio usuário.",
+      );
+    const visited = new Set([user.userId]);
+    let cursor: Actor | undefined = leader;
+    while (cursor) {
+      if (visited.has(cursor.userId))
+        throw new BadRequestException(
+          "A estrutura de liderança não pode formar um ciclo.",
+        );
+      visited.add(cursor.userId);
+      cursor = cursor.managerId ? byId.get(cursor.managerId) : undefined;
+    }
   }
   private async audit(
     client: PoolClient,
@@ -295,49 +356,87 @@ export class PostgresIdentityStore
     });
   }
   async create(actor: Actor, input: AccountInput): Promise<AccountUser> {
-    validateAccountPermissions(input.role, input.permissions);
-    const encoded = await hashPassword(input.password);
+    return (await this.createMany(actor, [input]))[0]!;
+  }
+  async createMany(
+    actor: Actor,
+    inputs: AccountInput[],
+  ): Promise<AccountUser[]> {
+    if (!inputs.length || inputs.length > 50)
+      throw new BadRequestException("Importe entre 1 e 50 usuários por lote.");
+    for (const input of inputs)
+      validateAccountPermissions(input.role, input.permissions);
+    if (
+      new Set(inputs.map((input) => input.username.toLowerCase())).size !==
+      inputs.length
+    )
+      throw new BadRequestException("Há nomes de usuário repetidos no lote.");
+    const encoded: string[] = [];
+    for (const input of inputs)
+      encoded.push(await hashPassword(input.password));
     return this.transaction(actor.tenantId, true, async (client) => {
       const manager = await this.manager(client, actor);
-      const payload: Actor = {
-        userId: randomUUID(),
-        tenantId: actor.tenantId,
-        name: input.name,
-        initials: initialsOf(input.name),
-        role: input.role,
-        departments: input.departments,
-        permissions: input.permissions,
-        active: true,
-      };
-      await client.query(
-        "INSERT INTO portal.users(tenant_id,id,payload) VALUES($1,$2,$3)",
-        [actor.tenantId, payload.userId, payload],
-      );
-      await client.query(
-        "INSERT INTO portal.credentials(tenant_id,user_id,login,password_hash,email) VALUES($1,$2,$3,$4,$5)",
-        [
-          actor.tenantId,
-          payload.userId,
-          input.username.toLowerCase(),
-          encoded,
-          input.email.toLowerCase(),
-        ],
-      );
-      await this.audit(
-        client,
-        manager,
-        "Usuário criado",
-        `Conta ${input.username.toLowerCase()} criada; permissões atribuídas pelo administrador.`,
-      );
-      return {
-        ...payload,
-        permissions: input.permissions,
-        username: input.username.toLowerCase(),
-        email: input.email.toLowerCase(),
-        active: true,
-        mustChangePassword: true,
-      };
+      const result: AccountUser[] = [];
+      for (const [index, input] of inputs.entries())
+        result.push(
+          await this.createInTransaction(
+            client,
+            manager,
+            input,
+            encoded[index]!,
+          ),
+        );
+      return result;
     });
+  }
+  private async createInTransaction(
+    client: PoolClient,
+    manager: Actor,
+    input: AccountInput,
+    encoded: string,
+  ): Promise<AccountUser> {
+    const actor = manager;
+    const payload: Actor = {
+      userId: randomUUID(),
+      tenantId: actor.tenantId,
+      name: input.name,
+      initials: initialsOf(input.name),
+      role: input.role,
+      departments: input.departments,
+      permissions: input.permissions,
+      active: true,
+      managerId: input.managerId || undefined,
+      homeView: input.homeView,
+    };
+    await this.validateOrganization(client, payload);
+    await client.query(
+      "INSERT INTO portal.users(tenant_id,id,payload) VALUES($1,$2,$3)",
+      [actor.tenantId, payload.userId, payload],
+    );
+    await client.query(
+      "INSERT INTO portal.credentials(tenant_id,user_id,login,password_hash,email) VALUES($1,$2,$3,$4,$5)",
+      [
+        actor.tenantId,
+        payload.userId,
+        input.username.toLowerCase(),
+        encoded,
+        input.email.toLowerCase(),
+      ],
+    );
+    await this.audit(
+      client,
+      manager,
+      "Usuário criado",
+      `Conta ${input.username.toLowerCase()} criada; permissões atribuídas pelo administrador.`,
+    );
+    return {
+      ...payload,
+      permissions: input.permissions,
+      username: input.username.toLowerCase(),
+      email: input.email.toLowerCase(),
+      active: true,
+      mustChangePassword: true,
+    };
   }
   async update(
     actor: Actor,
@@ -363,10 +462,16 @@ export class PostgresIdentityStore
         departments: input.departments ?? row.payload.departments,
         permissions: input.permissions ?? row.payload.permissions ?? [],
         initials: initialsOf(input.name ?? row.payload.name),
+        managerId:
+          input.managerId === undefined
+            ? row.payload.managerId
+            : input.managerId || undefined,
+        homeView: input.homeView ?? row.payload.homeView,
       };
       const active = input.active ?? row.active;
       payload.active = active;
       validateAccountPermissions(payload.role, payload.permissions ?? []);
+      await this.validateOrganization(client, payload, row.payload.departments);
       if (
         row.active &&
         row.payload.permissions?.includes("users.manage") &&

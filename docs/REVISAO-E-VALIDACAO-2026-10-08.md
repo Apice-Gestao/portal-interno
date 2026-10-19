@@ -1,6 +1,6 @@
 # Revisão, correções e validação do Portal Ápice
 
-Data: 08/10/2026. Projeto local: `<pasta-do-projeto>`. Este relatório atualiza o diagnóstico preservado em `AUDITORIA-PRD-2026-10-08.md`, feito sobre o commit `35e1d54`. O PRD foi lido integralmente: 19 páginas, 52 seções e CA01–CA15. O documento é referência de requisitos; pedidos do usuário determinam autorização e prioridade.
+Data: 08/10/2026. Projeto local: `<pasta do projeto>`. Este relatório atualiza o diagnóstico preservado em `AUDITORIA-PRD-2026-10-08.md`, feito sobre o commit `35e1d54`. O PRD foi lido integralmente: 19 páginas, 52 seções e CA01–CA15. O documento é referência de requisitos; pedidos do usuário determinam autorização e prioridade.
 
 ## Resultado atual
 

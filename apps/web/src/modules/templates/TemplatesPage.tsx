@@ -1,16 +1,18 @@
 import { SelectField } from "../../shared/ui/SelectField";
 import { useState } from "react";
 import type { FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
-  Plus,
-  Layers3,
-  ShieldCheck,
-  Pencil,
-  Play,
-  Check,
-  Search,
-  RefreshCw,
-} from "lucide-react";
+  AddIcon,
+  TaskBlueprintIcon,
+  ReviewIcon,
+  EditIcon,
+  StartIcon,
+  CheckIcon,
+  SearchIcon,
+  RefreshIcon,
+  ExportFileIcon,
+} from "../../shared/icons";
 import {
   DomainError,
   getTemplateWorkflow,
@@ -22,6 +24,16 @@ import type { Department, TaskTemplate } from "@apice/domain";
 import { usePortal } from "../../app/usePortal";
 import { WorkflowEditor } from "./WorkflowEditor";
 import {
+  CompanyWorkflowForm,
+  CompanyWorkflowSection,
+} from "./CompanyWorkflows";
+import { customizedCompanies } from "./company-workflows";
+import { DepartmentFlowsPage } from "./DepartmentFlowsPage";
+import { BulkImport } from "../../shared/ui/BulkOperations";
+import { downloadText } from "../../shared/downloads";
+import { csvCell } from "@apice/domain";
+import "./department-flows.css";
+import {
   Busy,
   CompetenceSelect,
   EmptyState,
@@ -30,6 +42,42 @@ import {
   PageHeading,
 } from "../../shared/ui/components";
 export default function TemplatesPage() {
+  const [params, setParams] = useSearchParams();
+  const flowTab = params.get("aba") === "implantacao";
+  return (
+    <>
+      <nav className="template-module-tabs" aria-label="Tipos de modelos">
+        <button
+          type="button"
+          aria-current={!flowTab ? "page" : undefined}
+          className={!flowTab ? "active" : ""}
+          onClick={() => setParams({})}
+        >
+          <TaskBlueprintIcon size={16} />
+          Modelos de tarefas
+        </button>
+        <button
+          type="button"
+          aria-current={flowTab ? "page" : undefined}
+          className={flowTab ? "active" : ""}
+          onClick={() => setParams({ aba: "implantacao" })}
+        >
+          <RefreshIcon size={16} />
+          Fluxos entre departamentos
+        </button>
+      </nav>
+      {flowTab ? (
+        <DepartmentFlowsPage
+          key={params.get("empresa") ?? "flows"}
+          initialCompanyId={params.get("empresa") ?? undefined}
+        />
+      ) : (
+        <TaskTemplatesPage />
+      )}
+    </>
+  );
+}
+export function TaskTemplatesPage() {
   const { actor, data, department, competence, client, refresh, notify } =
     usePortal();
   const [search, setSearch] = useState("");
@@ -39,9 +87,17 @@ export default function TemplatesPage() {
   }>();
   const [generation, setGeneration] = useState(false);
   const [selected, setSelected] = useState<TaskTemplate>();
+  const [companyEditor, setCompanyEditor] = useState<{
+    template: TaskTemplate;
+    companyId?: string;
+  }>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [result, setResult] = useState<{ created: number; existing: number }>();
+  const [result, setResult] = useState<{
+    created: number;
+    existing: number;
+    blocked?: number;
+  }>();
   const canManage = hasPermission(actor, "templates.manage");
   const templates = data.templates.filter(
     (t) =>
@@ -58,7 +114,7 @@ export default function TemplatesPage() {
       setResult(response);
       await refresh();
       notify(
-        `${response.created} tarefas geradas; ${response.existing} existentes preservadas.`,
+        `${response.created} tarefas geradas; ${response.existing} existentes preservadas.${response.blocked ? ` ${response.blocked} empresas aguardam a implantação.` : ""}`,
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Geração indisponível.");
@@ -66,13 +122,60 @@ export default function TemplatesPage() {
       setBusy(false);
     }
   }
-  const eligible = data.companies.filter((c) => c.active).length;
+  const blockedCompanies = new Set(
+    (data.companyOnboardings ?? [])
+      .filter(
+        (onboarding) =>
+          onboarding.status === "active" && onboarding.blockRecurring,
+      )
+      .map((onboarding) => onboarding.companyId),
+  );
+  const eligible = data.companies.filter(
+    (c) => c.active && !blockedCompanies.has(c.id),
+  ).length;
   return (
     <>
       <PageHeading
         title="Modelos de tarefa"
         description="Configure as obrigações que organizam cada competência."
       >
+        <button
+          className="button button-white"
+          onClick={() =>
+            downloadText(
+              "modelos-tarefas.csv",
+              [
+                [
+                  "titulo",
+                  "descricao",
+                  "departamento",
+                  "regime",
+                  "dia_meta",
+                  "dia_legal",
+                  "conferencia",
+                  "documento",
+                  "etapas_json",
+                ],
+                ...templates.map((model) => [
+                  model.title,
+                  model.description,
+                  model.department,
+                  model.regime,
+                  model.internalDay,
+                  model.legalDay,
+                  String(model.requiresReview),
+                  model.requiredDocument,
+                  JSON.stringify(getTemplateWorkflow(model)),
+                ]),
+              ]
+                .map((row) => row.map(csvCell).join(";"))
+                .join("\r\n"),
+            )
+          }
+        >
+          <ExportFileIcon size={16} /> Exportar
+        </button>
+        {canManage && <BulkImport kind="templates" />}
         {canManage && (
           <>
             <button
@@ -83,7 +186,7 @@ export default function TemplatesPage() {
                 setError("");
               }}
             >
-              <Play size={16} />
+              <StartIcon size={16} />
               Gerar competência
             </button>
             <button
@@ -92,7 +195,7 @@ export default function TemplatesPage() {
                 setEditor({ department });
               }}
             >
-              <Plus size={17} />
+              <AddIcon size={17} />
               Novo modelo
             </button>
           </>
@@ -100,7 +203,7 @@ export default function TemplatesPage() {
       </PageHeading>
       <div className="models-topline">
         <label className="search-field">
-          <Search size={17} />
+          <SearchIcon size={17} />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -121,7 +224,7 @@ export default function TemplatesPage() {
           >
             <div className="model-card-head">
               <span className="model-icon">
-                <Layers3 size={21} />
+                <TaskBlueprintIcon size={21} />
               </span>
               <span className="badge status-done">Ativo</span>
             </div>
@@ -144,21 +247,27 @@ export default function TemplatesPage() {
             </div>
             <footer>
               <span>
-                <Layers3 size={14} />
+                <TaskBlueprintIcon size={14} />
                 {getTemplateWorkflow(model).length} etapas
               </span>
               <span>
-                <ShieldCheck size={14} />
+                <ReviewIcon size={14} />
                 {model.requiresReview ? "Com conferência" : "Execução direta"}
               </span>
               <small>v{model.version}</small>
             </footer>
+            {customizedCompanies(model, data.companies).length > 0 && (
+              <span className="model-custom-count">
+                {customizedCompanies(model, data.companies).length} com etapas
+                próprias
+              </span>
+            )}
           </button>
         ))}
       </div>
       {!templates.length && <EmptyState />}
       <div className="info-box model-note">
-        <RefreshCw size={18} />
+        <RefreshIcon size={18} />
         <div>
           <strong>Geração sem duplicidade</strong>
           <p>
@@ -180,6 +289,14 @@ export default function TemplatesPage() {
           onClose={() => setEditor(undefined)}
         />
       )}
+      {companyEditor && canManage && (
+        <CompanyWorkflowForm
+          key={`${companyEditor.template.id}:${companyEditor.companyId ?? "new"}`}
+          template={companyEditor.template}
+          initialCompanyId={companyEditor.companyId}
+          onClose={() => setCompanyEditor(undefined)}
+        />
+      )}
       <Modal
         open={generation && canManage}
         onOpenChange={(value) => {
@@ -192,7 +309,7 @@ export default function TemplatesPage() {
           <CompetenceSelect />
           <div>
             <strong>{eligible}</strong>
-            <span>empresas ativas</span>
+            <span>empresas ativas liberadas</span>
           </div>
           <div>
             <strong>
@@ -201,8 +318,14 @@ export default function TemplatesPage() {
             <span>modelos de {department}</span>
           </div>
         </div>
+        {blockedCompanies.size > 0 && (
+          <p className="onboarding-generation-note">
+            {blockedCompanies.size} empresas aguardam a conclusão da implantação
+            antes de gerar rotinas. Tarefas existentes permanecem preservadas.
+          </p>
+        )}
         <div className="info-box">
-          <ShieldCheck size={19} />
+          <ReviewIcon size={19} />
           <p>
             O processamento é idempotente: tarefas existentes serão mantidas,
             com seu histórico e versão de fluxo.
@@ -214,6 +337,9 @@ export default function TemplatesPage() {
             <div>
               <strong>{result.created} novas tarefas geradas</strong>
               <p>{result.existing} tarefas já existiam e foram preservadas.</p>
+              {!!result.blocked && (
+                <p>{result.blocked} empresas aguardam a implantação.</p>
+              )}
             </div>
           </div>
         )}
@@ -283,6 +409,14 @@ export default function TemplatesPage() {
             <p className="muted-note">
               As tarefas preservam a versão de fluxo associada na geração.
             </p>
+            <CompanyWorkflowSection
+              template={selected}
+              canManage={canManage}
+              onEdit={(companyId) => {
+                setCompanyEditor({ template: selected, companyId });
+                setSelected(undefined);
+              }}
+            />
             {canManage && (
               <footer className="form-actions">
                 <button
@@ -295,7 +429,7 @@ export default function TemplatesPage() {
                     setSelected(undefined);
                   }}
                 >
-                  <Pencil size={16} aria-hidden="true" />
+                  <EditIcon size={16} aria-hidden="true" />
                   Editar modelo e fluxo
                 </button>
               </footer>
@@ -522,7 +656,7 @@ function TemplateForm({
 function CircleResult() {
   return (
     <span className="result-check">
-      <Check size={22} />
+      <CheckIcon size={22} />
     </span>
   );
 }

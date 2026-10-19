@@ -1,26 +1,29 @@
 import { useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
-  X,
-  CalendarDays,
-  Check,
-  Upload,
-  FileText,
-  ShieldCheck,
-  CircleCheck,
-  Clock3,
-  MoreHorizontal,
-  Download,
-  Play,
-  RotateCcw,
-} from "lucide-react";
+  CloseIcon,
+  CalendarIcon,
+  CheckIcon,
+  UploadIcon,
+  DocumentIcon,
+  ReviewIcon,
+  CompletedIcon,
+  ClockIcon,
+  MoreActionsIcon,
+  DownloadIcon,
+  StartIcon,
+  ReturnedIcon,
+  TransferIcon,
+} from "../../shared/icons";
 import {
   dateLabel,
+  businessTime,
   demoPdf,
   canExecute,
   hasPermission,
   isManager,
   statusLabels,
+  businessDate,
 } from "@apice/domain";
 import type { TaskCommand } from "@apice/domain";
 import { usePortal } from "../../app/usePortal";
@@ -30,14 +33,25 @@ import {
   TaskWorkflowLabel,
 } from "../../shared/ui/TaskStatus";
 import { SelectField } from "../../shared/ui/SelectField";
+import { documentsReady, latestDocuments } from "../documents/document-utils";
+import { downloadBlob } from "../../shared/downloads";
+import "../documents/documents.css";
 type ReasonAction =
-  "return" | "wait" | "request_dispense" | "dispense" | "reopen";
+  | "return"
+  | "wait"
+  | "request_dispense"
+  | "dispense"
+  | "reopen"
+  | "cancel"
+  | "retain_applicability";
 const reasonTitles = {
   return: "Devolver para correção",
   wait: "Registrar espera pelo cliente",
   request_dispense: "Solicitar dispensa",
   dispense: "Aprovar dispensa",
   reopen: "Reabrir tarefa",
+  cancel: "Cancelar tarefa",
+  retain_applicability: "Confirmar que a tarefa continua aplicável",
 };
 export function TaskDrawer({
   taskId,
@@ -58,6 +72,11 @@ export function TaskDrawer({
   const action = stagedAction?.type;
   const [reason, setReason] = useState("");
   const [more, setMore] = useState(false);
+  // Transfer dialog: undefined = closed, "" = open without a choice yet.
+  const [transferTo, setTransferTo] = useState<string>();
+  const [comment, setComment] = useState("");
+  const [documentTypeId, setDocumentTypeId] = useState("");
+  const [logicalId, setLogicalId] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const task = data.tasks.find((t) => t.id === taskId);
   function setAction(type?: ReasonAction) {
@@ -70,20 +89,52 @@ export function TaskDrawer({
   const company = data.companies.find((c) => c.id === task?.companyId);
   const user = data.users.find((u) => u.userId === task?.assigneeId);
   const manager = isManager(actor);
+  const canAssign = hasPermission(actor, "tasks.assign");
+  const canDispense = hasPermission(actor, "tasks.dispense");
+  const canReopen = hasPermission(actor, "tasks.reopen");
+  const canCancel = hasPermission(actor, "tasks.cancel");
+  // Any account granted "tasks.assign" may transfer (cargo is not a ceiling).
+  const canTransfer =
+    canAssign &&
+    !!task &&
+    !["done", "dispensed", "cancelled"].includes(task.status);
+  const transferCandidates = task
+    ? data.users.filter(
+        (u) =>
+          u.active !== false &&
+          canExecute(u) &&
+          u.departments.includes(task.department) &&
+          u.userId !== task.assigneeId,
+      )
+    : [];
   const writable = canExecute(actor);
-  const canEdit = writable && (task?.assigneeId === actor.userId || manager);
+  const queue = task?.assigneeId === `department:${task?.department}`;
+  const canEdit =
+    writable &&
+    !task?.applicabilityReview &&
+    (task?.assigneeId === actor.userId || manager);
+  const canStart =
+    writable &&
+    !task?.applicabilityReview &&
+    (task?.assigneeId === actor.userId || queue || manager);
+  const canClaim =
+    writable &&
+    queue &&
+    !task?.applicabilityReview &&
+    !!task &&
+    ["in_progress", "waiting", "in_review"].includes(task.status);
   const canAttach =
     hasPermission(actor, "tasks.attach") &&
     (task?.assigneeId === actor.userId || manager);
   const canReview =
+    !task?.applicabilityReview &&
     (actor.permissions === undefined
       ? writable
       : hasPermission(actor, "tasks.review")) &&
     task?.status === "in_review" &&
     !task.executionActorIds.includes(actor.userId);
   const ready =
-    task?.steps.every((s) => s.completed) &&
-    task.documents.at(-1)?.validation === "accepted";
+    !!task && task.steps.every((s) => s.completed) && documentsReady(task);
   async function command(input: TaskCommand) {
     if (!task || busy) return;
     setBusy(true);
@@ -94,6 +145,7 @@ export function TaskDrawer({
       setAction(undefined);
       setReason("");
       setMore(false);
+      setTransferTo(undefined);
       if (!canEdit && ["approve", "return"].includes(input.type)) {
         onClose();
         notify(
@@ -116,7 +168,10 @@ export function TaskDrawer({
     setBusy(true);
     setError("");
     try {
-      await client.attach(task.id, task.revision, file);
+      await client.attach(task.id, task.revision, file, {
+        logicalId: logicalId || undefined,
+        documentTypeId: documentTypeId || undefined,
+      });
       await refresh();
       notify(
         "Evidência anexada. Formato verificado; validação fiscal não executada.",
@@ -133,12 +188,7 @@ export function TaskDrawer({
     if (!task) return;
     try {
       const blob = await client.downloadDocument(task.id, docId);
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = name;
-      link.click();
-      window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+      downloadBlob(name, blob);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Download indisponível.");
     }
@@ -156,7 +206,14 @@ export function TaskDrawer({
     >
       <Dialog.Portal>
         <Dialog.Overlay className="drawer-overlay" />
-        <Dialog.Content className="drawer-content">
+        <Dialog.Content
+          className="drawer-content"
+          // TEMPORARY demo tour: its balloon sits outside the drawer.
+          onInteractOutside={(event) => {
+            if ((event.target as HTMLElement | null)?.closest?.(".demo-tour"))
+              event.preventDefault();
+          }}
+        >
           <div className="drawer-topline">
             <span className="eyebrow">DETALHE DA TAREFA</span>
             <Dialog.Close
@@ -164,7 +221,7 @@ export function TaskDrawer({
               aria-label="Fechar tarefa"
               disabled={busy}
             >
-              <X size={20} />
+              <CloseIcon size={20} />
             </Dialog.Close>
           </div>
           <Dialog.Title className="drawer-title">
@@ -178,81 +235,112 @@ export function TaskDrawer({
           {task && (
             <>
               <div className="drawer-meta">
-                <TaskDeadlineBadge task={task} today={data.now.slice(0, 10)} />
+                <TaskDeadlineBadge task={task} today={businessDate(data.now)} />
                 {!["done", "dispensed"].includes(task.status) && (
                   <TaskWorkflowLabel status={task.status} />
                 )}
                 <span className="small-text">{task.department}</span>
-                {manager && (
+                {task.onboardingId && (
+                  <span className="badge status-in_progress">
+                    Implantação inicial
+                  </span>
+                )}
+                {(canEdit ||
+                  canAssign ||
+                  canDispense ||
+                  canCancel ||
+                  canReopen) && (
                   <button
                     className="icon-button"
                     aria-label="Mais ações da tarefa"
                     onClick={() => setMore(!more)}
                     disabled={busy}
                   >
-                    <MoreHorizontal size={20} />
+                    <MoreActionsIcon size={20} />
                   </button>
                 )}
               </div>
-              {more && manager && (
+              {more && (
                 <div className="more-actions">
                   {canEdit && task.status === "in_progress" && (
                     <button onClick={() => setAction("wait")}>
                       Aguardar cliente
                     </button>
                   )}
-                  {manager &&
+                  {(canDispense || canEdit) &&
                     !["done", "dispensed"].includes(task.status) &&
                     !task.dispenseRequested && (
                       <button
                         onClick={() =>
-                          setAction(manager ? "dispense" : "request_dispense")
+                          setAction(
+                            canDispense ? "dispense" : "request_dispense",
+                          )
                         }
                       >
-                        {manager ? "Dispensar tarefa" : "Solicitar dispensa"}
+                        {canDispense
+                          ? "Dispensar tarefa"
+                          : "Solicitar dispensa"}
                       </button>
                     )}
-                  {manager && ["done", "dispensed"].includes(task.status) && (
-                    <button onClick={() => setAction("reopen")}>
-                      Reabrir tarefa
+                  {canReopen &&
+                    !task.onboardingId &&
+                    ["done", "dispensed"].includes(task.status) && (
+                      <button onClick={() => setAction("reopen")}>
+                        Reabrir tarefa
+                      </button>
+                    )}
+                  {canCancel &&
+                    !task.onboardingId &&
+                    !["done", "dispensed"].includes(task.status) && (
+                      <button onClick={() => setAction("cancel")}>
+                        Cancelar com justificativa
+                      </button>
+                    )}
+                  {canTransfer && (
+                    <button
+                      onClick={() => {
+                        setMore(false);
+                        setError("");
+                        setTransferTo("");
+                      }}
+                    >
+                      Transferir tarefa
                     </button>
                   )}
-                  {manager && (
-                    <label>
-                      Responsável
-                      <SelectField
-                        aria-label="Responsável pela tarefa"
-                        value={task.assigneeId}
-                        disabled={busy}
-                        onValueChange={(value) =>
-                          void command({
-                            type: "assign",
-                            assigneeId: value,
-                            expectedRevision: task.revision,
-                          })
-                        }
-                      >
-                        {data.users
-                          .filter(
-                            (u) =>
-                              u.active !== false &&
-                              canExecute(u) &&
-                              u.departments.includes(task.department),
-                          )
-                          .map((u) => (
-                            <option key={u.userId} value={u.userId}>
-                              {u.name}
-                            </option>
-                          ))}
-                      </SelectField>
-                    </label>
+                </div>
+              )}
+              {task.applicabilityReview && (
+                <div className="info-box" role="status">
+                  <strong>Revisão de aplicabilidade necessária</strong>
+                  <p>{task.applicabilityReview.reason}</p>
+                  <p>
+                    A execução aguarda o gestor confirmar a necessidade da
+                    tarefa ou cancelá-la com justificativa.
+                  </p>
+                  {hasPermission(actor, "tasks.manage") && (
+                    <button
+                      className="button button-white"
+                      disabled={busy}
+                      onClick={() => setAction("retain_applicability")}
+                    >
+                      Manter tarefa com justificativa
+                    </button>
+                  )}
+                  {canCancel && (
+                    <button
+                      className="button button-white"
+                      disabled={busy}
+                      onClick={() => setAction("cancel")}
+                    >
+                      Cancelar tarefa
+                    </button>
                   )}
                 </div>
               )}
               <div className="deadline-cards">
                 <div>
                   <span>
-                    <CalendarDays size={15} />
+                    <CalendarIcon size={15} />
                     Meta interna
                   </span>
                   <strong>
@@ -262,7 +350,7 @@ export function TaskDrawer({
                 </div>
                 <div>
                   <span>
-                    <ShieldCheck size={15} />
+                    <ReviewIcon size={15} />
                     Prazo legal
                   </span>
                   <strong>
@@ -275,11 +363,30 @@ export function TaskDrawer({
                 <span className="avatar avatar-small">{user?.initials}</span>
                 <div>
                   <small>Responsável pela execução</small>
-                  <strong>{user?.name}</strong>
+                  <strong>
+                    {user?.name ??
+                      (task.assigneeId.startsWith("department:")
+                        ? `Fila de ${task.department}`
+                        : "Responsável indisponível")}
+                  </strong>
                 </div>
+                {canTransfer && (
+                  <button
+                    type="button"
+                    className="button button-white drawer-transfer"
+                    onClick={() => {
+                      setError("");
+                      setTransferTo("");
+                    }}
+                    disabled={busy}
+                  >
+                    <TransferIcon size={15} aria-hidden="true" />
+                    Transferir
+                  </button>
+                )}
                 {task.startedAt && (
                   <span className="small-text">
-                    <Clock3 size={14} />
+                    <ClockIcon size={14} />
                     Iniciada em {dateLabel(task.startedAt)}
                   </span>
                 )}
@@ -292,6 +399,10 @@ export function TaskDrawer({
                     label: `Documentos (${task.documents.length})`,
                   },
                   { id: "history", label: "Histórico" },
+                  {
+                    id: "comments",
+                    label: `Comentários (${task.comments?.length ?? 0})`,
+                  },
                   { id: "pop", label: "P.O.P." },
                 ].map((item) => (
                   <button
@@ -337,7 +448,7 @@ export function TaskDrawer({
                             }
                           />
                           <span className="custom-checkbox" aria-hidden="true">
-                            {step.completed && <Check size={13} />}
+                            {step.completed && <CheckIcon size={13} />}
                           </span>
                           <span>
                             <small>Etapa {i + 1}</small>
@@ -347,7 +458,11 @@ export function TaskDrawer({
                       ))}
                     </div>
                     <div className="section-heading evidence-heading">
-                      <h3>Evidência obrigatória</h3>
+                      <h3>
+                        {task.evidenceRequired === false
+                          ? "Evidência complementar"
+                          : "Evidência obrigatória"}
+                      </h3>
                       <span
                         className={
                           task.documents.length
@@ -355,23 +470,82 @@ export function TaskDrawer({
                             : "warning-text"
                         }
                       >
-                        {task.documents.length ? "Anexada" : "Pendente"}
+                        {task.documents.length
+                          ? "Anexada"
+                          : task.evidenceRequired === false
+                            ? "Opcional"
+                            : "Pendente"}
                       </span>
                     </div>
+                    <div className="task-requirements">
+                      {(task.requiredDocumentTypeIds ?? []).map((id) => (
+                        <span
+                          key={id}
+                          className={`badge ${latestDocuments(task.documents).some((doc) => doc.documentTypeId === id) ? "status-done" : "status-waiting"}`}
+                        >
+                          {data.workspace.documentTypes.find(
+                            (type) => type.id === id,
+                          )?.name ?? id}
+                        </span>
+                      ))}
+                    </div>
                     <div className="required-document">
-                      <FileText size={24} />
+                      <DocumentIcon size={24} />
                       <div>
-                        <strong>{task.documentLabel}</strong>
+                        <strong>
+                          {task.documentLabel || "Documento da parametrização"}
+                        </strong>
                         <p>PDF ou XML · até 5 MB por arquivo</p>
                       </div>
                       {task.documents.length ? (
-                        <CircleCheck size={19} className="success-text" />
+                        <CompletedIcon size={19} className="success-text" />
                       ) : (
-                        <span className="required-label">Obrigatório</span>
+                        <span className="required-label">
+                          {task.evidenceRequired === false
+                            ? "Opcional"
+                            : "Obrigatório"}
+                        </span>
                       )}
                     </div>
                     {canAttach && task.status === "in_progress" && (
                       <>
+                        <div className="task-attachment-options">
+                          <SelectField
+                            label="Tipo do documento"
+                            value={documentTypeId}
+                            onValueChange={setDocumentTypeId}
+                          >
+                            <option value="">Documento complementar</option>
+                            {data.workspace.documentTypes.map((type) => (
+                              <option key={type.id} value={type.id}>
+                                {type.name}
+                              </option>
+                            ))}
+                          </SelectField>
+                          <SelectField
+                            label="Anexação"
+                            value={logicalId}
+                            onValueChange={(value) => {
+                              setLogicalId(value);
+                              const doc = task.documents.find(
+                                (item) => item.logicalId === value,
+                              );
+                              if (doc)
+                                setDocumentTypeId(doc.documentTypeId ?? "");
+                            }}
+                          >
+                            <option value="">
+                              Novo documento independente
+                            </option>
+                            {latestDocuments(task.documents)
+                              .filter((doc) => doc.logicalId)
+                              .map((doc) => (
+                                <option key={doc.id} value={doc.logicalId}>
+                                  Nova versão de {doc.name}
+                                </option>
+                              ))}
+                          </SelectField>
+                        </div>
                         <input
                           ref={fileRef}
                           type="file"
@@ -386,7 +560,7 @@ export function TaskDrawer({
                           disabled={busy}
                           onClick={() => fileRef.current?.click()}
                         >
-                          <Upload size={21} />
+                          <UploadIcon size={21} />
                           <strong>Selecionar evidência</strong>
                         </button>
                         <button
@@ -408,7 +582,7 @@ export function TaskDrawer({
                     )}
                     {task.requiresReview && (
                       <div className="info-box">
-                        <ShieldCheck size={18} />
+                        <ReviewIcon size={18} />
                         <div>
                           <strong>Conferência por outra pessoa</strong>
                           <p>
@@ -420,14 +594,14 @@ export function TaskDrawer({
                     )}
                     {task.dispenseRequested && (
                       <div className="info-box warning-box">
-                        <Clock3 size={18} />
+                        <ClockIcon size={18} />
                         <div>
                           <strong>Dispensa aguardando aprovação</strong>
                           <p>
                             Um coordenador deve analisar a justificativa no
                             histórico.
                           </p>
-                          {manager && (
+                          {canDispense && (
                             <button
                               className="text-button"
                               onClick={() => setAction("dispense")}
@@ -443,19 +617,19 @@ export function TaskDrawer({
                 {tab === "documents" && (
                   <>
                     <div className="section-heading">
-                      <h3>Versões da evidência</h3>
+                      <h3>Documentos e versões</h3>
                       <span>{task.documents.length} arquivos</span>
                     </div>
                     {task.documents.length ? (
                       [...task.documents].reverse().map((doc) => (
                         <div className="document-version" key={doc.id}>
                           <span className="file-icon">
-                            <FileText size={21} />
+                            <DocumentIcon size={21} />
                           </span>
                           <div>
                             <strong>{doc.name}</strong>
                             <p>
-                              Versão {doc.version} ·{" "}
+                              Versão {doc.logicalVersion ?? doc.version} ·{" "}
                               {(doc.bytes / 1024).toFixed(0)} KB ·{" "}
                               {dateLabel(doc.createdAt)}
                             </p>
@@ -469,14 +643,14 @@ export function TaskDrawer({
                               aria-label={`Baixar ${doc.name}`}
                               onClick={() => void download(doc.id, doc.name)}
                             >
-                              <Download size={17} />
+                              <DownloadIcon size={17} />
                             </button>
                           )}
                         </div>
                       ))
                     ) : (
                       <div className="empty-document">
-                        <FileText size={28} />
+                        <DocumentIcon size={28} />
                         <p>A evidência ainda não foi anexada.</p>
                         <button
                           className="text-button"
@@ -491,6 +665,72 @@ export function TaskDrawer({
                       análise de conteúdo ou antivírus.
                     </p>
                   </>
+                )}
+                {tab === "comments" && (
+                  <section className="task-comments">
+                    {(task.comments ?? []).map((item) => (
+                      <article key={item.id} className="task-comment">
+                        <header>
+                          <strong>{item.authorName}</strong>
+                          <small>
+                            {dateLabel(item.at)} · {businessTime(item.at)}
+                          </small>
+                        </header>
+                        <p>{item.text}</p>
+                      </article>
+                    ))}
+                    {!task.comments?.length && (
+                      <p className="muted-note">
+                        Nenhum comentário nesta tarefa.
+                      </p>
+                    )}
+                    {hasPermission(actor, "tasks.comment") && (
+                      <form
+                        className="task-comment-form"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          if (busy || !comment.trim()) return;
+                          setBusy(true);
+                          setError("");
+                          void client
+                            .addTaskComment(task.id, {
+                              expectedRevision: task.revision,
+                              text: comment,
+                            })
+                            .then(async () => {
+                              setComment("");
+                              await refresh();
+                              notify("Comentário registrado.");
+                            })
+                            .catch((cause) =>
+                              setError(
+                                cause instanceof Error
+                                  ? cause.message
+                                  : "Falha ao comentar.",
+                              ),
+                            )
+                            .finally(() => setBusy(false));
+                        }}
+                      >
+                        <label className="form-label">
+                          Comentário interno
+                          <textarea
+                            required
+                            maxLength={2000}
+                            value={comment}
+                            onChange={(event) => setComment(event.target.value)}
+                            rows={4}
+                          />
+                        </label>
+                        <button
+                          className="button button-primary"
+                          disabled={busy || !comment.trim()}
+                        >
+                          Publicar comentário
+                        </button>
+                      </form>
+                    )}
+                  </section>
                 )}
                 {tab === "history" && (
                   <div className="timeline">
@@ -518,7 +758,7 @@ export function TaskDrawer({
                           )}
                           <small>
                             {e.actorName} · {dateLabel(e.at)} às{" "}
-                            {e.at.slice(11, 16)}
+                            {businessTime(e.at)}
                           </small>
                         </div>
                       ))}
@@ -537,11 +777,11 @@ export function TaskDrawer({
                     </div>
                     {task.originalCompletedAt && (
                       <div className="info-box">
-                        <ShieldCheck size={17} />
+                        <ReviewIcon size={17} />
                         <p>
                           Primeira conclusão preservada:{" "}
                           {dateLabel(task.originalCompletedAt)} às{" "}
-                          {task.originalCompletedAt.slice(11, 16)}.
+                          {businessTime(task.originalCompletedAt)}.
                         </p>
                       </div>
                     )}
@@ -569,7 +809,7 @@ export function TaskDrawer({
                       </li>
                     </ol>
                     <div className="info-box">
-                      <FileText size={18} />
+                      <DocumentIcon size={18} />
                       <p>
                         Este roteiro é ilustrativo. Os procedimentos oficiais
                         devem ser validados com a equipe antes da operação real.
@@ -580,15 +820,19 @@ export function TaskDrawer({
               </div>
               <footer className="drawer-footer">
                 <div className="completion-note">
-                  <CircleCheck size={16} />
+                  <CompletedIcon size={16} />
                   <span>
                     {task.status === "done"
                       ? "Entrega concluída e registrada"
                       : task.status === "dispensed"
                         ? "Dispensa registrada no histórico"
                         : ready
-                          ? "Etapas e evidência completas"
-                          : "Conclua etapas e anexe a evidência"}
+                          ? task.evidenceRequired === false
+                            ? "Etapas concluídas"
+                            : "Etapas e evidência completas"
+                          : task.evidenceRequired === false
+                            ? "Conclua as etapas"
+                            : "Conclua etapas e anexe a evidência"}
                   </span>
                 </div>
                 <div className="drawer-footer-actions">
@@ -601,7 +845,7 @@ export function TaskDrawer({
                   >
                     Fechar
                   </button>
-                  {canEdit && ["todo", "returned"].includes(task.status) && (
+                  {canClaim && (
                     <button
                       className="button button-primary"
                       disabled={busy}
@@ -612,7 +856,22 @@ export function TaskDrawer({
                         })
                       }
                     >
-                      <Play size={16} />
+                      <StartIcon size={16} />
+                      <Busy busy={busy}>Assumir tarefa</Busy>
+                    </button>
+                  )}
+                  {canStart && ["todo", "returned"].includes(task.status) && (
+                    <button
+                      className="button button-primary"
+                      disabled={busy}
+                      onClick={() =>
+                        void command({
+                          type: "start",
+                          expectedRevision: task.revision,
+                        })
+                      }
+                    >
+                      <StartIcon size={16} />
                       <Busy busy={busy}>Iniciar execução</Busy>
                     </button>
                   )}
@@ -671,16 +930,18 @@ export function TaskDrawer({
                       Retomar execução
                     </button>
                   )}
-                  {manager && ["done", "dispensed"].includes(task.status) && (
-                    <button
-                      className="button button-white"
-                      disabled={busy}
-                      onClick={() => setAction("reopen")}
-                    >
-                      <RotateCcw size={15} />
-                      Reabrir tarefa
-                    </button>
-                  )}
+                  {canReopen &&
+                    !task.onboardingId &&
+                    ["done", "dispensed"].includes(task.status) && (
+                      <button
+                        className="button button-white"
+                        disabled={busy}
+                        onClick={() => setAction("reopen")}
+                      >
+                        <ReturnedIcon size={15} />
+                        Reabrir tarefa
+                      </button>
+                    )}
                 </div>
                 {task.status === "in_review" &&
                   task.executionActorIds.includes(actor.userId) && (
@@ -743,6 +1004,98 @@ export function TaskDrawer({
                 disabled={busy || reason.trim().length < 8}
               >
                 <Busy busy={busy}>Confirmar e registrar</Busy>
+              </button>
+            </footer>
+          </form>
+        </Modal>
+      )}
+      {task && (
+        <Modal
+          open={transferTo !== undefined}
+          onOpenChange={(open) => {
+            if (!open && !busy) setTransferTo(undefined);
+          }}
+          title="Transferir tarefa"
+          description={`${company?.name ?? "Empresa"} · ${task.title}. A transferência fica registrada no histórico.`}
+        >
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!transferTo) return;
+              void command({
+                type: "assign",
+                assigneeId: transferTo,
+                expectedRevision: task.revision,
+              });
+            }}
+          >
+            <p className="transfer-current">
+              Hoje com{" "}
+              <strong>
+                {user?.name ??
+                  (queue ? `a fila de ${task.department}` : "ninguém")}
+              </strong>
+            </p>
+            <div
+              className="transfer-options"
+              role="radiogroup"
+              aria-label="Novo responsável"
+            >
+              {transferCandidates.map((candidate) => {
+                const open = data.tasks.filter(
+                  (item) =>
+                    item.assigneeId === candidate.userId &&
+                    !["done", "dispensed", "cancelled"].includes(item.status),
+                ).length;
+                return (
+                  <label
+                    key={candidate.userId}
+                    className={`transfer-option ${transferTo === candidate.userId ? "is-selected" : ""}`}
+                  >
+                    <input
+                      type="radio"
+                      name="transfer-to"
+                      value={candidate.userId}
+                      checked={transferTo === candidate.userId}
+                      onChange={() => setTransferTo(candidate.userId)}
+                      disabled={busy}
+                    />
+                    <span className="avatar avatar-small">
+                      {candidate.initials}
+                    </span>
+                    <span className="transfer-option-name">
+                      <strong>{candidate.name}</strong>
+                      <small>
+                        {open}{" "}
+                        {open === 1 ? "tarefa aberta" : "tarefas abertas"}
+                      </small>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+            {!transferCandidates.length && (
+              <p className="muted-note">
+                Não há outra pessoa ativa em {task.department} para receber a
+                tarefa.
+              </p>
+            )}
+            <FormError message={error} />
+            <footer className="form-actions">
+              <button
+                type="button"
+                className="button button-white"
+                disabled={busy}
+                onClick={() => setTransferTo(undefined)}
+              >
+                Cancelar
+              </button>
+              <button
+                className="button button-primary"
+                disabled={busy || !transferTo}
+              >
+                <TransferIcon size={16} aria-hidden="true" />
+                <Busy busy={busy}>Transferir</Busy>
               </button>
             </footer>
           </form>

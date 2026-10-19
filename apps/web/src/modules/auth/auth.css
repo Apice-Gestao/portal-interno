@@ -13,10 +13,18 @@
   padding: clamp(32px, 5vw, 76px);
   background: #16afc4;
 }
-.auth-wordmark {
-  font-size: 2.25rem;
-  font-weight: 700;
-  letter-spacing: -1px;
+.auth-logo {
+  max-width: 100%;
+  align-self: center;
+}
+.auth-logo img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 119px;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
 }
 .auth-introduction-copy {
   max-width: 390px;
@@ -44,9 +52,486 @@
   line-height: 1.6;
 }
 .auth-content {
+  position: relative;
   display: grid;
   place-items: center;
   padding: 48px 32px;
+}
+.auth-change-group {
+  position: absolute;
+  top: 24px;
+  left: 32px;
+  color: var(--teal);
+  font-size: 0.8125rem;
+  padding: 8px 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.ecosystem-page {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: clamp(28px, 7vw, 100px) clamp(16px, 5vw, 64px);
+  background: var(--ecosystem-bg, #16afc4);
+  color: #15202b;
+  transition: background-color 0.4s ease;
+}
+/* TEMPORARY background trial: keep headings readable on dark and light choices. */
+.ecosystem-page[data-tone="dark"] .ecosystem-heading h1,
+.ecosystem-page[data-tone="dark"] .ecosystem-note {
+  color: white;
+}
+/* TEMPORARY card trial: only the card surface and button adapt; logos stay untouched. */
+.ecosystem-page[data-card-tone] .ecosystem-card {
+  background:
+    radial-gradient(
+      120% 60% at 50% 0%,
+      rgb(255 255 255 / 0.28),
+      transparent 65%
+    ),
+    var(--ecosystem-card-bg);
+}
+.ecosystem-page[data-card-tone="dark"] .ecosystem-card,
+.ecosystem-page[data-card-tone="mid"] .ecosystem-card {
+  border-color: rgb(255 255 255 / 0.22);
+}
+.ecosystem-page[data-card-tone="dark"] .ecosystem-card::before {
+  border-color: #16afc4;
+}
+.ecosystem-page[data-card-tone="dark"] .ecosystem-cta {
+  background: white;
+  color: #0e7f87;
+}
+.ecosystem-page[data-card-tone="dark"] .ecosystem-card:hover .ecosystem-cta,
+.ecosystem-page[data-card-tone="dark"]
+  .ecosystem-card:focus-visible
+  .ecosystem-cta {
+  background: #16afc4;
+  color: #15202b;
+}
+.ecosystem-page[data-tone="light"] .ecosystem-badge {
+  color: #0e7f87;
+  text-shadow: none;
+}
+/* Depth with brand transparencies only: soft glows plus a faint dot grid. */
+.ecosystem-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      60% 55% at 50% 0%,
+      rgb(255 255 255 / 0.32),
+      transparent 70%
+    ),
+    radial-gradient(
+      45% 50% at 0% 100%,
+      rgb(14 127 135 / 0.38),
+      transparent 70%
+    ),
+    radial-gradient(
+      40% 45% at 100% 85%,
+      rgb(14 127 135 / 0.28),
+      transparent 70%
+    );
+}
+.ecosystem-backdrop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(
+    rgb(255 255 255 / 0.28) 1.2px,
+    transparent 1.4px
+  );
+  background-size: 22px 22px;
+  mask-image: radial-gradient(70% 60% at 50% 40%, black, transparent);
+}
+.ecosystem-heading {
+  max-width: 880px;
+  margin-bottom: clamp(32px, 5vw, 52px);
+  text-align: center;
+  animation: ecosystem-rise 0.6s ease-out both;
+}
+.ecosystem-badge {
+  display: inline-block;
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 400;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 12px rgb(14 127 135 / 0.45);
+}
+.ecosystem-badge strong {
+  font-weight: 800;
+}
+.ecosystem-heading h1 {
+  margin: 20px 0 0;
+  font-size: clamp(2.125rem, 5vw, 4rem);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+}
+.ecosystem-groups {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(14px, 2vw, 24px);
+  max-width: 1120px;
+  width: 100%;
+}
+/* Light aqua cards: white blended with the brand blue, never flat white. */
+.ecosystem-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 40px 30px 30px;
+  border: 1px solid rgb(255 255 255 / 0.75);
+  border-radius: 24px;
+  background:
+    radial-gradient(
+      120% 60% at 50% 0%,
+      rgb(255 255 255 / 0.85),
+      transparent 65%
+    ),
+    linear-gradient(
+      170deg,
+      color-mix(in srgb, #16afc4 12%, white),
+      color-mix(in srgb, #16afc4 26%, white)
+    );
+  box-shadow:
+    inset 0 1px 0 white,
+    0 22px 44px -24px rgb(14 127 135 / 0.6);
+  color: #15202b;
+  /* `backwards` only: a filled animation would override the hover transition and make cards jump. */
+  animation: ecosystem-rise 0.6s ease-out backwards;
+  animation-delay: calc(0.12s + var(--order, 0) * 0.08s);
+  transition:
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* Gradients cannot transition, so the hover brightening fades in on its own layer. */
+.ecosystem-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: radial-gradient(100% 70% at 50% 0%, white, transparent 75%);
+  opacity: 0;
+  transition: opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ecosystem-card:hover::after,
+.ecosystem-card:focus-visible::after {
+  opacity: 1;
+}
+.ecosystem-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border: 2px solid #0e7f87;
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ecosystem-card:hover,
+.ecosystem-card:focus-visible {
+  transform: translateY(-6px);
+  box-shadow:
+    inset 0 1px 0 white,
+    0 30px 56px -24px rgb(14 127 135 / 0.8);
+}
+.ecosystem-card:hover::before,
+.ecosystem-card:focus-visible::before {
+  opacity: 1;
+}
+.ecosystem-card:focus-visible {
+  outline: 3px solid #15202b;
+  outline-offset: 5px;
+}
+.ecosystem-logo {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 92px;
+  margin-bottom: 30px;
+}
+.ecosystem-logo img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 92px;
+  object-fit: contain;
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ecosystem-card:hover .ecosystem-logo img,
+.ecosystem-card:focus-visible .ecosystem-logo img {
+  transform: scale(1.04);
+}
+.ecosystem-card h2 {
+  font-size: 1.3125rem;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  color: #15202b;
+}
+.ecosystem-card p {
+  flex: 1;
+  max-width: 250px;
+  margin: 10px 0 28px;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: #15202b;
+  opacity: 0.75;
+}
+.ecosystem-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 11px 20px;
+  border-radius: 999px;
+  background: #0e7f87;
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 600;
+  box-shadow: 0 8px 18px -8px rgb(14 127 135 / 0.7);
+  transition:
+    background 0.35s ease,
+    color 0.35s ease;
+}
+.ecosystem-cta > svg {
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ecosystem-card:hover .ecosystem-cta,
+.ecosystem-card:focus-visible .ecosystem-cta {
+  background: color-mix(in srgb, #0e7f87 78%, #15202b);
+  color: white;
+}
+.ecosystem-card:hover .ecosystem-cta > svg,
+.ecosystem-card:focus-visible .ecosystem-cta > svg {
+  transform: translateX(4px);
+}
+.ecosystem-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 34px;
+  color: #15202b;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  opacity: 0.85;
+  animation: ecosystem-rise 0.6s ease-out 0.45s both;
+}
+.ecosystem-palette-trigger {
+  position: absolute;
+  right: clamp(14px, 2.5vw, 28px);
+  bottom: clamp(14px, 2.5vw, 28px);
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid rgb(255 255 255 / 0.45);
+  background: rgb(255 255 255 / 0.2);
+  color: #15202b;
+  opacity: 0.7;
+  backdrop-filter: blur(6px);
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s ease;
+}
+.ecosystem-page[data-tone="dark"] .ecosystem-palette-trigger {
+  color: white;
+}
+.ecosystem-page[data-tone="light"] .ecosystem-palette-trigger {
+  border-color: rgb(14 127 135 / 0.25);
+  background: rgb(14 127 135 / 0.08);
+  color: #0e7f87;
+}
+.ecosystem-palette-trigger:hover,
+.ecosystem-palette-trigger[data-state="open"] {
+  opacity: 1;
+  transform: rotate(-12deg);
+}
+.ecosystem-palette-trigger:focus-visible {
+  opacity: 1;
+  outline: 3px solid #15202b;
+  outline-offset: 3px;
+}
+.ecosystem-palette {
+  z-index: 160;
+  width: min(320px, calc(100vw - 24px));
+  max-height: min(70vh, 560px);
+  overflow-y: auto;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: white;
+  color: #15202b;
+  box-shadow: 0 18px 44px rgb(21 32 43 / 0.22);
+}
+.ecosystem-palette-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 14px;
+  border-radius: 10px;
+  background: var(--paper);
+}
+.ecosystem-palette-tabs > button {
+  padding: 7px 10px;
+  border-radius: 7px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--muted);
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+.ecosystem-palette-tabs > button[aria-selected="true"] {
+  background: white;
+  color: #0e7f87;
+  box-shadow: 0 1px 3px rgb(21 32 43 / 0.12);
+}
+.ecosystem-palette-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.ecosystem-palette-heading strong {
+  font-size: 0.875rem;
+}
+.ecosystem-palette-heading .text-button {
+  font-size: 0.75rem;
+}
+.ecosystem-palette-hint {
+  margin: 4px 0 12px;
+  font-size: 0.6875rem;
+  color: var(--muted);
+}
+.ecosystem-palette-group + .ecosystem-palette-group {
+  margin-top: 12px;
+}
+.ecosystem-palette-group > span {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.ecosystem-palette-group > div {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 7px;
+}
+.ecosystem-swatch {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1px solid rgb(21 32 43 / 0.14);
+  color: white;
+  transition: transform 0.2s ease;
+}
+.ecosystem-swatch[data-tone="light"] {
+  color: #15202b;
+}
+.ecosystem-swatch:hover {
+  transform: scale(1.12);
+}
+.ecosystem-swatch[aria-checked="true"] {
+  outline: 2px solid #0e7f87;
+  outline-offset: 2px;
+}
+.ecosystem-swatch:focus-visible {
+  outline: 2px solid #15202b;
+  outline-offset: 2px;
+}
+.ecosystem-disclaimer {
+  margin-top: 10px;
+  color: #15202b;
+  font-size: 0.6875rem;
+  font-style: italic;
+  opacity: 0.7;
+  animation: ecosystem-rise 0.6s ease-out 0.5s backwards;
+}
+.ecosystem-page[data-tone="dark"] .ecosystem-disclaimer {
+  color: white;
+}
+@keyframes ecosystem-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ecosystem-heading,
+  .ecosystem-card,
+  .ecosystem-note,
+  .ecosystem-disclaimer {
+    animation: none;
+  }
+  .ecosystem-card,
+  .ecosystem-card::before,
+  .ecosystem-card::after,
+  .ecosystem-logo img,
+  .ecosystem-cta,
+  .ecosystem-cta > svg {
+    transition: none;
+  }
+  .ecosystem-card:hover,
+  .ecosystem-card:focus-visible,
+  .ecosystem-card:hover .ecosystem-logo img {
+    transform: none;
+  }
+}
+@media (max-width: 760px) {
+  .ecosystem-page {
+    padding-bottom: 84px;
+  }
+  .ecosystem-groups {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .ecosystem-card {
+    padding: 26px 22px 22px;
+    border-radius: 20px;
+  }
+  .ecosystem-logo {
+    height: 72px;
+    margin-bottom: 12px;
+  }
+  .ecosystem-logo img {
+    max-height: 72px;
+  }
+  .ecosystem-card p {
+    margin-bottom: 18px;
+  }
+  .auth-change-group {
+    position: static;
+    justify-self: start;
+    margin-bottom: 22px;
+  }
+  .auth-content {
+    grid-template-rows: auto 1fr;
+  }
 }
 .auth-card {
   width: min(100%, 420px);
@@ -200,8 +685,8 @@
     gap: 24px;
     padding: 28px 28px 32px;
   }
-  .auth-wordmark {
-    font-size: 1.75rem;
+  .auth-logo {
+    width: min(100%, 240px);
   }
   .auth-introduction-copy {
     max-width: 100%;
@@ -230,4 +715,65 @@
   .auth-form {
     margin-top: 24px;
   }
+}
+/* Phones: one continuous brand-blue page with the form on a raised white card,
+   instead of a blue block stacked over a gray block (17/10/2026). */
+@media (max-width: 760px) {
+  .auth-page {
+    grid-template-rows: auto 1fr;
+    background:
+      radial-gradient(
+        120% 45% at 50% 0%,
+        rgb(255 255 255 / 0.25),
+        transparent 65%
+      ),
+      linear-gradient(180deg, #16afc4, color-mix(in srgb, #16afc4 86%, #0e7f87));
+  }
+  .auth-introduction {
+    align-items: center;
+    gap: 18px;
+    padding: 30px 24px 52px;
+    background: transparent;
+    text-align: center;
+  }
+  .auth-introduction h1 {
+    margin-inline: auto;
+    font-size: 1.75rem;
+  }
+  .auth-introduction-copy p {
+    margin-inline: auto;
+    max-width: 300px;
+  }
+  .auth-content {
+    align-content: start;
+    margin: -32px 12px 16px;
+    padding: 22px 20px 28px;
+    border-radius: 24px;
+    background: white;
+    box-shadow:
+      0 1px 2px rgb(21 32 43 / 0.06),
+      0 24px 48px -24px rgb(14 127 135 / 0.7);
+  }
+  .auth-change-group {
+    margin-bottom: 14px;
+  }
+}
+
+/* Hosted preview: demo credentials notice (17/10/2026). */
+.auth-demo-note {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, #0e7f87 35%, white);
+  border-radius: 10px;
+  background: color-mix(in srgb, #16afc4 6%, white);
+  color: #15202b;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.auth-demo-reset {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  font-size: inherit;
 }

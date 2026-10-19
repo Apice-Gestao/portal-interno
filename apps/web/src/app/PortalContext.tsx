@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useLocation } from "react-router-dom";
-import { DomainError } from "@apice/domain";
+import { closedCompetence, DomainError } from "@apice/domain";
 import type { Department } from "@apice/domain";
 import { Context } from "./usePortal";
 import { createClient } from "../services/portal-client";
@@ -12,15 +12,28 @@ import LoginPage, {
   PasswordResetPage,
 } from "../modules/auth/LoginPage";
 import EmailCodePage from "../modules/auth/EmailCodePage";
+import { useOrganization } from "./OrganizationContext";
+import { OrganizationSelection } from "../modules/auth/OrganizationSelection";
 export function PortalProvider({ children }: { children: ReactNode }) {
+  const { group } = useOrganization();
   const cache = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
   const [client] = useState(createClient);
-  const [session, setSession] = useState<LoginSession>();
+  useEffect(
+    () => () => {
+      void client.logout().catch(() => undefined);
+    },
+    [client],
+  );
+  const [session, setSession] = useState<LoginSession | undefined>(() =>
+    client.restoreSession?.(),
+  );
   const [challenge, setChallenge] = useState<EmailChallenge>();
   const [department, setDepartment] = useState<Department>("Fiscal");
-  const [competence, setCompetence] = useState("2026-09");
+  // Until the person picks one, the session follows the competence that has
+  // just closed in Brasília, by the server clock once the snapshot arrives.
+  const [chosenCompetence, setCompetence] = useState<string>();
   const [toast, setToast] = useState("");
   const query = useQuery({
     queryKey: ["snapshot", session?.actor.tenantId, session?.actor.userId],
@@ -39,7 +52,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     ? department
     : (query.data?.actor.departments[0] ?? department);
   async function login(username: string, password: string) {
-    const next = await client.authenticate(username, password);
+    const next = await client.authenticate(username, password, group?.id);
     cache.clear();
     if ("requiresSecondFactor" in next) {
       setSession(undefined);
@@ -72,6 +85,8 @@ export function PortalProvider({ children }: { children: ReactNode }) {
   async function refresh() {
     await cache.invalidateQueries({ queryKey: ["snapshot"] });
   }
+  if (!group && location.pathname !== "/redefinir-senha")
+    return <OrganizationSelection />;
   if (location.pathname === "/redefinir-senha")
     return (
       <PasswordResetPage
@@ -138,7 +153,7 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         data: query.data,
         department: currentDepartment,
         setDepartment,
-        competence,
+        competence: chosenCompetence ?? closedCompetence(query.data.now),
         setCompetence,
         logout,
         refresh,

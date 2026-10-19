@@ -1,16 +1,30 @@
 import { useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { ArrowRight, LogOut } from "lucide-react";
+import { BackIcon, ForwardIcon, SignOutIcon } from "../../shared/icons";
 import { Busy, FormError } from "../../shared/ui/components";
 import "./auth.css";
+import { ORGANIZATIONS, useOrganization } from "../../app/OrganizationContext";
+import { isHostedDemo, resetDemo } from "../../services/portal-client";
 
 export function AuthLayout({ children }: { children: ReactNode }) {
+  const { group, clearGroup } = useOrganization();
+  const brand = group ?? ORGANIZATIONS[0];
   return (
     <main className="auth-page">
       <aside className="auth-introduction" aria-label="Portal interno Ápice">
-        <span className="auth-wordmark">Ápice</span>
+        <div className={`auth-logo auth-logo-${brand.id}`}>
+          <img
+            src={brand.logo.src}
+            alt={brand.name}
+            width={brand.logo.width}
+            height={brand.logo.height}
+            fetchPriority="high"
+          />
+        </div>
         <div className="auth-introduction-copy">
-          <span className="auth-eyebrow">PORTAL INTERNO</span>
+          <span className="auth-eyebrow">
+            {group?.name ?? "PORTAL INTERNO"}
+          </span>
           <h1>Acesse o seu ambiente de trabalho.</h1>
           <p>
             As abas e ações disponíveis seguem as permissões do seu usuário.
@@ -20,7 +34,16 @@ export function AuthLayout({ children }: { children: ReactNode }) {
           Acesso restrito a usuários autorizados.
         </span>
       </aside>
-      <section className="auth-content">{children}</section>
+      <section className="auth-content">
+        <button
+          type="button"
+          className="auth-change-group"
+          onClick={clearGroup}
+        >
+          <BackIcon size={16} /> Escolher outro grupo
+        </button>
+        {children}
+      </section>
     </main>
   );
 }
@@ -129,7 +152,7 @@ export default function LoginPage({
                     <Busy busy={pending}>
                       {pending ? "Solicitando..." : "Enviar instruções"}
                     </Busy>
-                    {!pending && <ArrowRight size={18} aria-hidden="true" />}
+                    {!pending && <ForwardIcon size={18} aria-hidden="true" />}
                   </button>
                 </fieldset>
               </form>
@@ -156,6 +179,24 @@ export default function LoginPage({
         <p className="auth-description">
           Informe seu usuário e senha para continuar.
         </p>
+        {isHostedDemo && (
+          <p className="auth-demo-note">
+            Demonstração com dados fictícios. Administrador: usuário{" "}
+            <strong>admin</strong>, senha <strong>admin</strong>. Visão do
+            operador: usuário <strong>operador</strong>, senha{" "}
+            <strong>operador</strong>. As alterações ficam só neste navegador.{" "}
+            <button
+              type="button"
+              className="auth-link auth-demo-reset"
+              onClick={() => {
+                resetDemo();
+                window.location.reload();
+              }}
+            >
+              Recomeçar a demonstração do zero
+            </button>
+          </p>
+        )}
         <form className="auth-form" onSubmit={submit}>
           <fieldset disabled={pending}>
             <label htmlFor="login-username">Usuário</label>
@@ -181,21 +222,23 @@ export default function LoginPage({
             <FormError message={error} />
             <button className="auth-submit" type="submit">
               <Busy busy={pending}>{pending ? "Entrando..." : "Entrar"}</Busy>
-              {!pending && <ArrowRight size={18} aria-hidden="true" />}
+              {!pending && <ForwardIcon size={18} aria-hidden="true" />}
             </button>
           </fieldset>
         </form>
-        <button
-          className="auth-link"
-          type="button"
-          disabled={pending}
-          onClick={() => {
-            setRecovering(true);
-            setError("");
-          }}
-        >
-          Esqueci minha senha
-        </button>
+        {!isHostedDemo && (
+          <button
+            className="auth-link"
+            type="button"
+            disabled={pending}
+            onClick={() => {
+              setRecovering(true);
+              setError("");
+            }}
+          >
+            Esqueci minha senha
+          </button>
+        )}
         <p className="auth-help">
           Para obter acesso, fale com o administrador do sistema.
         </p>
@@ -298,7 +341,7 @@ export function PasswordResetPage({
                   <Busy busy={pending}>
                     {pending ? "Salvando..." : "Salvar nova senha"}
                   </Busy>
-                  {!pending && <ArrowRight size={18} aria-hidden="true" />}
+                  {!pending && <ForwardIcon size={18} aria-hidden="true" />}
                 </button>
               </fieldset>
             </form>
@@ -414,7 +457,7 @@ export function PasswordChangePage({
               <Busy busy={pending}>
                 {pending ? "Salvando..." : "Salvar nova senha"}
               </Busy>
-              {!pending && <ArrowRight size={18} aria-hidden="true" />}
+              {!pending && <ForwardIcon size={18} aria-hidden="true" />}
             </button>
           </fieldset>
         </form>
@@ -424,7 +467,7 @@ export function PasswordChangePage({
           disabled={pending}
           onClick={onLogout}
         >
-          <LogOut size={16} aria-hidden="true" />
+          <SignOutIcon size={16} aria-hidden="true" />
           Sair
         </button>
       </div>

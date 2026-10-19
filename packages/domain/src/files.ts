@@ -1,4 +1,4 @@
-import { DomainError } from "./engine.js";
+import { DomainError } from "./errors.js";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
 export const MAX_FILE_BYTES = 5 * 1024 * 1024;
 export async function validateEvidence(

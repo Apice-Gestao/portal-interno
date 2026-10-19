@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DomainError } from "@apice/domain";
-import { LogOut, Monitor } from "lucide-react";
+import { SignOutIcon, TvDisplayIcon } from "../../shared/icons";
 import { Modal, FormError } from "../../shared/ui/components";
 import { tvWatchClient } from "./tv-watch-client";
 import { TvBoard } from "./TvBoard";
@@ -80,7 +80,7 @@ export default function TvWatchPage() {
     return (
       <main className="tv-pair-screen">
         <section className="tv-pair-card">
-          <Monitor size={35} aria-hidden="true" />
+          <TvDisplayIcon size={35} aria-hidden="true" />
           <span className="tv-wordmark">Ápice Contábil</span>
           <h1>Conectar este painel</h1>
           <p>
@@ -120,7 +120,7 @@ export default function TvWatchPage() {
     return (
       <main className="tv-pair-screen">
         <section className="tv-pair-card">
-          <Monitor size={35} />
+          <TvDisplayIcon size={35} />
           <h1>
             {query.isError ? "Aguardando conexão" : "Preparando o painel"}
           </h1>
@@ -150,7 +150,7 @@ export default function TvWatchPage() {
               setDisconnectOpen(true);
             }}
           >
-            <LogOut size={18} />
+            <SignOutIcon size={18} />
           </button>
         }
       />

@@ -1,9 +1,16 @@
 import { SelectField } from "../../shared/ui/SelectField";
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { canExecute, hasPermission, taskSchema } from "@apice/domain";
+import {
+  businessDate,
+  canExecute,
+  hasPermission,
+  suggestedDeadlines,
+  taskSchema,
+} from "@apice/domain";
 import { usePortal } from "../../app/usePortal";
 import { Busy, FormError, Modal } from "../../shared/ui/components";
+import { DatePicker } from "../../shared/ui/CompetencePicker";
 export function NewTaskModal({
   open,
   onOpenChange,
@@ -16,6 +23,8 @@ export function NewTaskModal({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const canCreate = hasPermission(actor, "tasks.create");
+  // Brasília dates from the server clock; the person can change both.
+  const suggested = suggestedDeadlines(data.now);
   const assignees = data.users.filter(
     (user) =>
       user.active !== false &&
@@ -44,7 +53,7 @@ export function NewTaskModal({
     try {
       await client.addTask(result.data);
       await refresh();
-      setCompetence(data.now.slice(0, 7));
+      setCompetence(businessDate(data.now).slice(0, 7));
       onOpenChange(false);
       notify("Tarefa avulsa criada e atribuída.");
     } catch (e) {
@@ -104,19 +113,19 @@ export function NewTaskModal({
         </label>
         <label>
           Meta interna
-          <input
+          <DatePicker
             name="internalDue"
-            type="date"
-            defaultValue="2026-10-15"
+            label="Meta interna"
+            defaultValue={suggested.internalDue}
             required
           />
         </label>
         <label>
           Prazo legal
-          <input
+          <DatePicker
             name="legalDue"
-            type="date"
-            defaultValue="2026-10-20"
+            label="Prazo legal"
+            defaultValue={suggested.legalDue}
             required
           />
         </label>

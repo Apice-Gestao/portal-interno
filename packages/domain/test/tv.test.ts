@@ -79,7 +79,7 @@ describe("TV device schemas", () => {
     { name: "x".repeat(61) },
     { departments: [] },
     { departments: ["Fiscal", "Fiscal"] },
-    { departments: ["Jurídico"] },
+    { departments: [""] },
     { competence: "2026-00" },
     { competence: "2026-13" },
     { competence: "0000-01" },

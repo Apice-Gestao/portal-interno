@@ -4,9 +4,9 @@ import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
 import { json, urlencoded } from "express";
 import type { Request, Response, NextFunction } from "express";
 import helmet from "helmet";
-import { randomUUID } from "node:crypto";
 import { AppModule } from "./app.module.js";
 import { ErrorFilter } from "./common/error.filter.js";
+import { requestTrail } from "./common/technical-log.js";
 export const ALLOWED_ORIGINS = [
   "http://127.0.0.1:5173",
   "http://localhost:5173",
@@ -34,13 +34,20 @@ export async function createApplication() {
     logger: ["error", "warn"],
   });
   app.use(helmet());
+  app.use(requestTrail);
   const standardJson = json({ limit: "64kb" });
   const importJson = json({ limit: "256kb" });
   app.use((req: Request, res: Response, next: NextFunction) => {
-    const parser =
-      req.path.replace(/\/$/, "") === "/api/v1/companies/import"
-        ? importJson
-        : standardJson;
+    const parser = [
+      "/api/v1/companies/import",
+      "/api/v1/tasks/import",
+      "/api/v1/task-templates/import",
+      "/api/v1/companies/change-proposals/batch",
+      "/api/v1/users/import",
+      "/api/v1/workspace-settings",
+    ].includes(req.path.replace(/\/$/, ""))
+      ? importJson
+      : standardJson;
     parser(req, res, next);
   });
   app.use(urlencoded({ extended: false, limit: "16kb" }));
@@ -88,7 +95,6 @@ export async function createApplication() {
       });
       return;
     }
-    res.setHeader("X-Request-Id", randomUUID());
     res.setHeader("Cache-Control", "no-store");
     next();
   });

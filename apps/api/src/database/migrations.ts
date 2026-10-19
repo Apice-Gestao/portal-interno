@@ -53,6 +53,14 @@ export async function migrateDatabase(pool: Pool, runtimeRole: string) {
     await client.query(
       `GRANT SELECT,INSERT,UPDATE ON portal.tv_devices TO "${runtimeRole}"`,
     );
+    await client.query(`GRANT SELECT,INSERT,UPDATE ON portal.workspace_settings,portal.company_change_proposals TO "${runtimeRole}"`);
+    await client.query(
+      `GRANT SELECT,INSERT,UPDATE ON portal.department_flows,portal.company_onboardings TO "${runtimeRole}"`,
+    );
+    // Automatic generation lists the groups; only their IDs, never names.
+    await client.query(
+      `GRANT SELECT (id) ON portal.tenants TO "${runtimeRole}"`,
+    );
     await client.query(
       `GRANT USAGE ON ALL SEQUENCES IN SCHEMA portal TO "${runtimeRole}"`,
     );

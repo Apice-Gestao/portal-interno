@@ -1,0 +1,78 @@
+.process-board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(175px, 1fr));
+  gap: 16px;
+  overflow-x: auto;
+  padding-bottom: 18px;
+}
+.process-column {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+  min-height: 360px;
+}
+.process-column > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  padding: 5px 4px 18px;
+}
+.process-column h2 {
+  font-size: 0.875rem;
+}
+.process-column > header span {
+  font-size: 0.75rem;
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: white;
+  color: var(--teal);
+}
+.process-card {
+  background: white;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  display: grid;
+  gap: 11px;
+  margin-bottom: 12px;
+  cursor: grab;
+  box-shadow: 0 3px 8px #15202b04;
+}
+.process-card h3 {
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+.process-card p,
+.process-card small {
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.process-card-steps {
+  font-size: 0.7rem;
+  color: var(--teal);
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.process-card > .text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.process-instruction {
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+.process-in_review > header {
+  color: var(--warning);
+}
+.process-closed > header {
+  color: var(--success);
+}
+@media (max-width: 760px) {
+  .process-board {
+    grid-template-columns: repeat(4, minmax(240px, 1fr));
+  }
+}

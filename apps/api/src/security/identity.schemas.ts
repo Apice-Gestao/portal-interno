@@ -38,9 +38,16 @@ const email = z
   .email()
   .transform((value) => value.toLowerCase());
 const departments = z
-  .array(z.enum(["Fiscal", "Contábil", "Pessoal"]))
+  .array(
+    z
+      .string()
+      .trim()
+      .min(1)
+      .max(80)
+      .regex(/^[\p{L}\p{N}_ -]+$/u),
+  )
   .min(1, "Selecione ao menos um departamento.")
-  .max(3)
+  .max(30)
   .refine(
     (values) => new Set(values).size === values.length,
     "Departamentos repetidos.",
@@ -52,9 +59,22 @@ const permissions = z
     (values) => new Set(values).size === values.length,
     "Permissões repetidas.",
   );
-const role = z.enum(["admin", "supervisor", "operator"]);
+const role = z.enum([
+  "admin",
+  "supervisor",
+  "coordinator",
+  "manager",
+  "director",
+  "operator",
+  "viewer",
+]);
+const homeView = z.enum(["personal", "team", "management", "executive"]);
 export const loginSchema = z
-  .object({ username, password: z.string().min(1).max(128) })
+  .object({
+    username,
+    password: z.string().min(1).max(128),
+    groupId: z.enum(["contabil", "go", "condominios"]).optional(),
+  })
   .strict();
 export const passwordSchema = z
   .object({
@@ -63,7 +83,20 @@ export const passwordSchema = z
   })
   .strict();
 export const accountInputSchema = z
-  .object({ name, username, email, password, departments, permissions, role })
+  .object({
+    name,
+    username,
+    email,
+    password,
+    departments,
+    permissions,
+    role,
+    managerId: z.string().max(80).optional(),
+    homeView: homeView.optional(),
+  })
+  .strict();
+export const accountImportSchema = z
+  .object({ users: z.array(accountInputSchema).min(1).max(50) })
   .strict();
 export const accountUpdateSchema = accountInputSchema
   .partial()
@@ -88,8 +121,18 @@ export function validateAccountPermissions(
     "tasks.review": "tasks.view",
     "tasks.manage": "tasks.view",
     "tasks.export": "tasks.view",
+    "tasks.assign": "tasks.view",
+    "tasks.dispense": "tasks.view",
+    "tasks.reopen": "tasks.view",
+    "tasks.cancel": "tasks.view",
+    "tasks.comment": "tasks.view",
+    "overview.view": "tasks.view",
     "companies.manage": "companies.view",
     "templates.manage": "templates.view",
+    "reports.performance.view": "reports.view",
+    "processes.manage": "processes.view",
+    "documents.manage": "documents.view",
+    "changes.manage": "companies.view",
     "tv.manage": "tv.view",
     "tv.configure": "tv.view",
     "tv.team.view": "tv.view",

@@ -15,7 +15,7 @@ Solicitado explicitamente em 13/10/2026 para visualizar e testar administrador e
 ## Remover antes de produção / VPS
 
 1. Remover `apps/api/src/security/local-test-login.ts`, seu uso em `SessionService`/`SessionController`, o modo `local-test` e a resposta de sessão direta no login. O fluxo normal volta a aceitar somente o desafio de autenticação.
-2. Remover `scripts/prepare-local-test.mjs`, a chamada em `scripts/dev.mjs`, as variáveis temporárias da configuração privada e seus exemplos.
+2. Remover `scripts/prepare-local-test.mjs` e `scripts/prepare-demo-data.mjs` (dados fictícios de demonstração, 17/10/2026), as chamadas em `scripts/dev.mjs`, as variáveis temporárias da configuração privada e seus exemplos.
 3. Remover o indicador da interface, as exceções temporárias do formulário de usuários (e-mail opcional das fixtures e bloqueio de reset) e os testes específicos do atalho (`apps/api/test/local-test-login.test.ts` e `scripts/test-local-test.mjs`), preservando testes de identidade, autorização e MFA.
 4. Excluir o tenant fictício e seus registros relacionados de qualquer conjunto destinado à produção. Exportação e backup atualmente incluem tenants; verificar isso antes de migrar. Não apagar tenants reais nem remover registros da auditoria por caminhos operacionais.
 5. Revalidar login individual, recuperação, MFA obrigatório, revogação, permissões e implantação com o atalho ausente.

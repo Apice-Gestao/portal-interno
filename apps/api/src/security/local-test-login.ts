@@ -4,9 +4,15 @@ import { users } from "@apice/domain";
 // TEMPORARY TEST ACCESS: remove this module and its callers before VPS release.
 // Credentials are supplied privately; only this isolated fixture tenant is eligible.
 export const LOCAL_TEST_TENANT = "apice-local-test";
+export const LOCAL_TEST_GROUPS = {
+  contabil: LOCAL_TEST_TENANT,
+  go: "apice-local-test-go",
+  condominios: "apice-local-test-condominios",
+} as const;
+export type PortalGroup = keyof typeof LOCAL_TEST_GROUPS;
 
 export function isLocalTestShortcutAccount(tenantId: string, userId: string) {
-  return tenantId === LOCAL_TEST_TENANT && ["helena", "julia"].includes(userId);
+  return Object.values(LOCAL_TEST_GROUPS).some((id) => id === tenantId) && ["helena", "julia"].includes(userId);
 }
 
 export function localTestLoginEnabled(env: NodeJS.ProcessEnv = process.env) {
@@ -44,6 +50,7 @@ export function localTestIdentity(
   username: string,
   password: string,
   env: NodeJS.ProcessEnv = process.env,
+  groupId: PortalGroup = "contabil",
 ) {
   if (
     !localTestLoginEnabled(env) ||
@@ -57,6 +64,6 @@ export function localTestIdentity(
       : undefined;
   const actor = users.find((user) => user.userId === userId);
   return actor
-    ? { ...structuredClone(actor), tenantId: LOCAL_TEST_TENANT }
+    ? { ...structuredClone(actor), tenantId: LOCAL_TEST_GROUPS[groupId] }
     : undefined;
 }

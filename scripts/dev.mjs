@@ -19,7 +19,13 @@ if (process.env.PORTAL_STORAGE === "postgres") {
     [tsc, "-p", "apps/api/tsconfig.json"],
     [path.join(root, "scripts/migrate.mjs")],
     [path.join(root, "scripts/seed.mjs")],
-    ...(localTest ? [[path.join(root, "scripts/prepare-local-test.mjs")]] : []),
+    ...(localTest
+      ? [
+          [path.join(root, "scripts/prepare-local-test.mjs")],
+          // TEMPORARY: fictitious demonstration records (remove before the VPS).
+          [path.join(root, "scripts/prepare-demo-data.mjs")],
+        ]
+      : []),
     ...(process.env.PORTAL_BOOTSTRAP_USERNAME &&
     process.env.PORTAL_BOOTSTRAP_PASSWORD
       ? [[path.join(root, "scripts/bootstrap-admin.mjs")]]

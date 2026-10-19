@@ -1,5 +1,5 @@
 import * as Select from "@radix-ui/react-select";
-import { Check, ChevronDown, ChevronUp } from "lucide-react";
+import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "../icons";
 import {
   Children,
   Fragment,
@@ -155,7 +155,7 @@ export function SelectField({
             {selected?.label}
           </Select.Value>
           <Select.Icon className="select-field-icon">
-            <ChevronDown size={15} aria-hidden="true" />
+            <ChevronDownIcon size={15} aria-hidden="true" />
           </Select.Icon>
         </Select.Trigger>
         <Select.Portal>
@@ -166,7 +166,7 @@ export function SelectField({
             collisionPadding={12}
           >
             <Select.ScrollUpButton className="select-field-scroll">
-              <ChevronUp size={16} aria-hidden="true" />
+              <ChevronUpIcon size={16} aria-hidden="true" />
             </Select.ScrollUpButton>
             <Select.Viewport className="select-field-options">
               {choices.map((option, index) => (
@@ -179,13 +179,13 @@ export function SelectField({
                 >
                   <Select.ItemText>{option.label}</Select.ItemText>
                   <Select.ItemIndicator className="select-field-check">
-                    <Check size={15} aria-hidden="true" />
+                    <CheckIcon size={15} aria-hidden="true" />
                   </Select.ItemIndicator>
                 </Select.Item>
               ))}
             </Select.Viewport>
             <Select.ScrollDownButton className="select-field-scroll">
-              <ChevronDown size={16} aria-hidden="true" />
+              <ChevronDownIcon size={16} aria-hidden="true" />
             </Select.ScrollDownButton>
           </Select.Content>
         </Select.Portal>

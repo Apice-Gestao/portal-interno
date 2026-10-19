@@ -9,6 +9,7 @@ import {
 } from "@apice/domain";
 import { PortalController } from "./portal/portal.controller.js";
 import { PortalService } from "./portal/portal.service.js";
+import { AutoGenerationService } from "./portal/auto-generation.service.js";
 import { PORTAL_STORE } from "./database/portal-store.js";
 import { MemoryPortalStore } from "./database/memory-store.js";
 import { PostgresPortalStore } from "./database/postgres-store.js";
@@ -37,6 +38,7 @@ import {
   ],
   providers: [
     PortalService,
+    AutoGenerationService,
     SessionService,
     TVService,
     TvPairGuard,

@@ -4,7 +4,7 @@ Estado de 08/10/2026. O projeto usa PostgreSQL local exclusivo, autorizado pelo 
 
 ## Executar
 
-Na pasta `<pasta-do-projeto>`, com Node/npm e binários PostgreSQL instalados:
+Na pasta `<pasta do projeto>`, com Node/npm e binários PostgreSQL instalados:
 
 ```powershell
 npm ci
